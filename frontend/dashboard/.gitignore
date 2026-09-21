@@ -1,0 +1,8 @@
+server.log=.*
+node_modules
+dist
+build
+.env
+.env.production
+.DS_Store
+*.log
