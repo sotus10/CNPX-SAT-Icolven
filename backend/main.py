@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from clima import obtener_clima
 # Coordenadas de tu zona (Medellín/Icolven)
 from supabase_client import supabase  # Importas el cliente configurado
@@ -32,7 +31,6 @@ def obtener_datos_sensor_y_clima():
 
 if __name__ == "__main__":
     obtener_datos_sensor_y_clima()
-=======
 import os
 from pathlib import Path
 
@@ -61,4 +59,3 @@ def read_root():
         "message": "SAT Backend API funcionando correctamente",
         "supabase_connected": supabase is not None
     }
->>>>>>> f745c4a ( containerizacion backend, conexion supabase y readme)
