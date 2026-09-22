@@ -1,6 +1,18 @@
+import os
+from pathlib import Path
+from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+# Importaciones existentes del clima y cliente
 from clima import obtener_clima
-# Coordenadas de tu zona (Medellín/Icolven)
-from supabase_client import supabase  # Importas el cliente configurado
+from supabase_client import supabase
+
+# Importamos las funciones CRUD que ya probamos y funcionan
+from crud import obtener_ultima_lectura, obtener_ultimas_lecturas, obtener_alertas
+
+load_dotenv(Path(__file__).with_name(".env"))
+
 LATITUD = 6.25
 LONGITUD = -75.56
 
@@ -19,8 +31,9 @@ def obtener_datos_sensor_y_clima():
 
         try:
             # Guarda la información directamente en la tabla 'mediciones' de Supabase
-            respuesta = supabase.table("mediciones").insert(registro).execute()
-            print("[OK] Guardado en Supabase:", respuesta.data)
+            if supabase:
+                respuesta = supabase.table("mediciones").insert(registro).execute()
+                print("[OK] Guardado en Supabase:", respuesta.data)
         except Exception as e:
             print(f"[ERROR] No se pudo guardar en Supabase: {e}")
 
@@ -28,30 +41,16 @@ def obtener_datos_sensor_y_clima():
     else:
         return None
 
-
 if __name__ == "__main__":
     obtener_datos_sensor_y_clima()
-import os
-from pathlib import Path
 
-from fastapi import FastAPI
-from dotenv import load_dotenv
-from supabase import create_client, Client
-
-load_dotenv(Path(__file__).with_name(".env"))
-
-app = FastAPI(title="SAT Backend API")
+# Inicialización de FastAPI (Mantenemos tu bloque intacto)
+app = FastAPI(title="SAT Backend API", description="API para el Sistema de Alerta Temprana")
 
 url: str = os.getenv("SUPABASE_URL", "").strip()
 key: str = os.getenv("SUPABASE_KEY", "").strip()
 
-supabase: Client | None = None
-if url and key:
-    try:
-        supabase = create_client(url, key)
-    except Exception as e:
-        print(f"Error al conectar con Supabase: {e}")
-
+# (Nota: supabase ya se importa arriba desde supabase_client, pero mantenemos la lógica segura)
 @app.get("/")
 def read_root():
     return {
@@ -59,3 +58,27 @@ def read_root():
         "message": "SAT Backend API funcionando correctamente",
         "supabase_connected": supabase is not None
     }
+
+# ==========================================
+# NUEVOS ENDPOINTS DE LA TAREA 11
+# ==========================================
+
+@app.get("/ultima-lectura")
+def get_ultima_lectura():
+    """Devuelve la medición más reciente registrada por el sensor."""
+    resultado = obtener_ultima_lectura()
+    if not resultado:
+        raise HTTPException(status_code=404, detail="No se encontró ninguna lectura reciente.")
+    return resultado
+
+@app.get("/historial")
+def get_historial(limite: int = 10):
+    """Devuelve el historial de lecturas recientes."""
+    resultado = obtener_ultimas_lecturas(limite=limite)
+    return resultado
+
+@app.get("/alertas")
+def get_alertas(limite: int = 10):
+    """Devuelve el registro de alertas generadas en el sistema."""
+    resultado = obtener_alertas(limite=limite)
+    return resultado

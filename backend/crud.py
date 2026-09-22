@@ -78,3 +78,26 @@ def obtener_datos_satelitales_recientes():
     except Exception as e:
         print(f"[ERROR] Error al consultar datos satelitales: {e}")
         return []
+
+
+def obtener_ultima_lectura():
+    """Devuelve únicamente el registro más reciente de la tabla lecturas."""
+    if not supabase:
+        return None
+    try:
+        respuesta = supabase.table("lecturas").select("*").order("timestamp", desc=True).limit(1).execute()
+        return respuesta.data[0] if respuesta.data else None
+    except Exception as e:
+        print(f"[ERROR] Error al consultar la última lectura: {e}")
+        return None
+
+def obtener_alertas(limite: int = 10):
+    """Devuelve una lista con las alertas registradas en el sistema."""
+    if not supabase:
+        return []
+    try:
+        respuesta = supabase.table("alertas").select("*").order("timestamp", desc=True).limit(limite).execute()
+        return respuesta.data
+    except Exception as e:
+        print(f"[ERROR] Error al consultar alertas: {e}")
+        return []
