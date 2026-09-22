@@ -1,0 +1,19 @@
+from clima import obtener_clima
+# Coordenadas de tu zona (Medellín/Icolven)
+LATITUD = 6.25
+LONGITUD = -75.56
+
+def obtener_datos_sensor_y_clima():
+    # Consulta de los datos del clima
+    datos_clima = obtener_clima(LATITUD, LONGITUD)
+
+    if datos_clima:
+        lluvia_1h = datos_clima["lluvia_ultima_hora"]
+        lluvia_24h = datos_clima["lluvia_acumulada_24h"]
+
+        return {
+            "lluvia_ultima_hora": lluvia_1h,
+            "lluvia_acumulada_24h": lluvia_24h
+        }
+    else:
+        return None

@@ -44,6 +44,7 @@ def obtener_clima(lat, lon):
 
     # Retorno por defecto en caso de que ocurra cualquier error
     return None
-# Prueba directa de la función
-resultado = obtener_clima(6.25, -75.56)
-print("Resultado:", resultado)
+if __name__ == "__main__":
+    # Prueba rápida que solo se ejecuta al correr 'python clima.py'
+    resultado = obtener_clima(6.25, -75.56)
+    print("Resultado de prueba:", resultado)
