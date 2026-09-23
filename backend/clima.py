@@ -1,6 +1,21 @@
 import requests
 
 def obtener_clima(lat, lon):
+    """
+    Consulta la lluvia reciente en un punto usando Open-Meteo.
+
+    Parámetros:
+        lat (float): latitud del punto a consultar.
+        lon (float): longitud del punto a consultar.
+
+    Devuelve:
+        dict con "lluvia_ultima_hora" (mm) y "lluvia_acumulada_24h" (mm)
+        si la consulta fue exitosa.
+        None si hubo cualquier error (timeout, sin conexión, o respuesta
+        inesperada de la API). El error se imprime en consola, pero la
+        función NO lanza una excepción: quien la llame debe revisar
+        "if resultado:" antes de usar los datos.
+    """
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,

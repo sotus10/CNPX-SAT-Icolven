@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Importaciones locales del proyecto
@@ -15,12 +16,28 @@ from crud import (
 
 load_dotenv(Path(__file__).with_name(".env"))
 
+# Inicialización única de FastAPI con configuración de CORS
 app = FastAPI(
     title="SAT Backend API - Sistema de Alerta Temprana",
     description="API REST del Sistema de Alerta Temprana (SAT) para Icolven."
 )
 
-# Coordenadas de tu zona (Medellín/Icolven)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Coordenadas de la zona (Medellín/Icolven)
 LATITUD = 6.25
 LONGITUD = -75.56
 
@@ -39,7 +56,7 @@ def get_ultima_lectura():
     """Retorna la lectura limpia más reciente registrada por el sistema."""
     lectura = obtener_ultima_lectura()
     if not lectura:
-        return {"status": "error", "message": "No se encontraron lecturas registradas."}
+        raise HTTPException(status_code=404, detail="No se encontraron lecturas registradas.")
     return {"status": "success", "data": lectura}
 
 @app.get("/historial")
