@@ -5,6 +5,8 @@ import { NAV_LINKS, PROJECT_NAME } from "@/data/mock";
 import { Button, EASE } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
+const DASHBOARD_LOGIN_URL = "http://localhost:3000/login";
+
 export function Navbar() {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
@@ -34,9 +36,14 @@ export function Navbar() {
           </ul>
         </nav>
         <div className="hidden lg:block">
-          <Button variant="outline" href="#contacto">
-            Hablemos
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" href={DASHBOARD_LOGIN_URL}>
+              Login
+            </Button>
+            <Button variant="outline" href="#contacto">
+              Hablemos
+            </Button>
+          </div>
         </div>
         <button
           className="flex h-10 w-10 items-center justify-center rounded-full text-ink lg:hidden"
@@ -74,9 +81,14 @@ export function Navbar() {
               </ul>
             </nav>
             <div className="mt-12">
-              <Button href="#contacto" onClick={() => setOpen(false)}>
-                Hablemos
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button href={DASHBOARD_LOGIN_URL} onClick={() => setOpen(false)}>
+                  Login
+                </Button>
+                <Button href="#contacto" onClick={() => setOpen(false)}>
+                  Hablemos
+                </Button>
+              </div>
             </div>
           </motion.div>
         )}

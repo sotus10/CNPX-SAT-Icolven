@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -46,6 +47,21 @@ if __name__ == "__main__":
 
 # Inicialización de FastAPI (Mantenemos tu bloque intacto)
 app = FastAPI(title="SAT Backend API", description="API para el Sistema de Alerta Temprana")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 url: str = os.getenv("SUPABASE_URL", "").strip()
 key: str = os.getenv("SUPABASE_KEY", "").strip()
