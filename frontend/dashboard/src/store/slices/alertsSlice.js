@@ -7,7 +7,7 @@ export const loadAlerts = createAsyncThunk(
     try {
       return await api.fetchAlerts(status);
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.detail ?? error.message);
     }
   }
 );
@@ -56,6 +56,7 @@ const alertsSlice = createSlice({
     builder
       .addCase(loadAlerts.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(loadAlerts.fulfilled, (state, action) => {
         state.loading = false;

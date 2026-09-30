@@ -7,6 +7,16 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const getDataEndpointError = (error, resource) => {
+  if (!error.response) {
+    return `No se pudo conectar con la API (${API_URL}). Verifica que el backend esté activo.`;
+  }
+  if (error.response.status >= 500) {
+    return `La API responde, pero no pudo consultar ${resource}. Verifica SUPABASE_URL y SUPABASE_KEY en backend/.env.`;
+  }
+  return error.response.data?.detail ?? error.message;
+};
+
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -39,8 +49,13 @@ export const fetchSatelliteData = async (params = {}) => {
 };
 
 export const fetchSensorHistory = async (limit = 48) => {
-  const { data } = await apiClient.get('/historial', { params: { limite: limit } });
-  return data;
+  let data;
+  try {
+    ({ data } = await apiClient.get('/historial', { params: { limite: limit } }));
+  } catch (error) {
+    throw new Error(getDataEndpointError(error, 'las lecturas'));
+  }
+  return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
 };
 
 export const fetchLatestSensorReading = async () => {
@@ -84,8 +99,18 @@ export const fetchCommsStatus = async () => {
 };
 
 export const fetchAlerts = async () => {
-  const { data } = await apiClient.get('/alertas', { params: { limite: 100 } });
-  return data.map((alert) => {
+  let data;
+  try {
+    ({ data } = await apiClient.get('/alertas', { params: { limite: 100 } }));
+  } catch (error) {
+    throw new Error(getDataEndpointError(error, 'las alertas'));
+  }
+  const alerts = Array.isArray(data) ? data : data?.data;
+  if (!Array.isArray(alerts)) {
+    throw new Error('La API devolvió un formato de alertas no válido.');
+  }
+
+  return alerts.map((alert) => {
     const level = String(alert.nivel_final ?? 'VERDE').toUpperCase();
     const severity = {
       ROJO: 'critical',
