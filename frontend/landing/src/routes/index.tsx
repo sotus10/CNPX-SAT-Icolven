@@ -5,6 +5,7 @@ import { Hero } from "@/components/Hero";
 import { StatBand } from "@/components/StatBand";
 import { Problema } from "@/components/Problema";
 import { ComoFunciona } from "@/components/ComoFunciona";
+import { DatosSatelitales } from "@/components/DatosSatelitales";
 import { Story3D } from "@/components/Story3D";
 import { Niveles } from "@/components/Niveles";
 import { Dashboard } from "@/components/Dashboard";
@@ -14,12 +15,23 @@ import { Equipo } from "@/components/Equipo";
 import { Cierre, Footer } from "@/components/Cierre";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { Divider } from "@/components/ui/primitives";
+import type { SatelliteData } from "@/components/DatosSatelitales";
 
 const TITLE = "Cauce · Sistema de alerta temprana de crecientes con LoRa";
 const DESC =
   "Alerta temprana de inundaciones para municipios ribereños de Colombia. Sensores solares, radio LoRa 900 MHz, validación satelital y alertas a la comunidad.";
 
 export const Route = createFileRoute("/")({
+  loader: async (): Promise<SatelliteData | null> => {
+    const apiBase = (import.meta.env.VITE_SAT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+    try {
+      const response = await fetch(`${apiBase}/satelital`);
+      if (!response.ok) return null;
+      return (await response.json()) as SatelliteData;
+    } catch {
+      return null;
+    }
+  },
   head: () => ({
     meta: [
       { title: TITLE },
@@ -34,6 +46,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const satelliteData = Route.useLoaderData();
   return (
     <ReactLenis root options={{ lerp: 0.1, smoothWheel: true }}>
       <ScrollProgress />
@@ -44,6 +57,7 @@ function Index() {
         <Problema />
         <Divider />
         <ComoFunciona />
+        <DatosSatelitales initialData={satelliteData} />
         <Story3D />
         <Divider />
         <Niveles />

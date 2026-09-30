@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Bell, Radio, Ruler, Satellite } from "lucide-react";
+import { ArrowDownRight, Bell, Radio, Ruler, Satellite } from "lucide-react";
 import { STEPS } from "@/data/mock";
 import { EASE, Eyebrow, Item, SectionWrapper } from "@/components/ui/primitives";
 
@@ -60,6 +60,12 @@ export function ComoFunciona() {
           El cruce satelital existe para eliminar falsas alarmas. Un sistema que grita sin razón deja de ser
           creído, y una alerta en la que nadie cree no sirve de nada.
         </p>
+        <a
+          href="#datos-satelitales"
+          className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-aqua-deep transition hover:gap-3"
+        >
+          Ver datos satelitales en vivo <ArrowDownRight size={16} aria-hidden="true" />
+        </a>
       </Item>
     </SectionWrapper>
   );
