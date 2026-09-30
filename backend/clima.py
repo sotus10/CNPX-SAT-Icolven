@@ -1,5 +1,6 @@
 import requests
 
+
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 
@@ -68,21 +69,7 @@ def obtener_datos_satelitales(lat, lon, past_days=2, forecast_days=7):
 
 
 def obtener_clima(lat, lon):
-    """
-    Consulta la lluvia reciente en un punto usando Open-Meteo.
-
-    Parámetros:
-        lat (float): latitud del punto a consultar.
-        lon (float): longitud del punto a consultar.
-
-    Devuelve:
-        dict con "lluvia_ultima_hora" (mm) y "lluvia_acumulada_24h" (mm)
-        si la consulta fue exitosa.
-        None si hubo cualquier error (timeout, sin conexión, o respuesta
-        inesperada de la API). El error se imprime en consola, pero la
-        función NO lanza una excepción: quien la llame debe revisar
-        "if resultado:" antes de usar los datos.
-    """
+    """Devuelve la precipitación horaria actual y la acumulada en 24 horas."""
     datos = obtener_datos_satelitales(lat, lon, past_days=1, forecast_days=1)
     if datos is None:
         return None
@@ -91,7 +78,8 @@ def obtener_clima(lat, lon):
         "lluvia_ultima_hora": datos["current"]["precipitation_mm"],
         "lluvia_acumulada_24h": datos["accumulated_24h_mm"],
     }
+
+
 if __name__ == "__main__":
-    # Prueba rápida que solo se ejecuta al correr 'python clima.py'
-    resultado = obtener_clima(6.25, -75.56)
+    resultado = obtener_clima(6.244, -75.581)
     print("Resultado de prueba:", resultado)

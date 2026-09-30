@@ -1,5 +1,6 @@
 from crud import (
     insertar_lectura,
+    insertar_lectura_cruda,
     obtener_ultimas_lecturas,
     insertar_alerta,
     obtener_datos_satelitales_recientes
@@ -12,7 +13,16 @@ if __name__ == "__main__":
     nodo_real_id = "02c04a53-220c-4a10-b05e-1e24878eedd4"
     
     # 1. Insertar una lectura de prueba (Nivel cambiado a 'AMARILLO' por el CHECK de la base de datos)
-    lectura_resultado = insertar_lectura(nodo_real_id, 45.2, 3.1, "AMARILLO")
+    datos_crudos = {
+        "nodo_id": nodo_real_id,
+        "distancia_cm": 45.2,
+        "velocidad_cm_min": 3.1,
+        "nivel": "AMARILLO",
+    }
+    lectura_cruda_id = insertar_lectura_cruda(datos_crudos)
+    lectura_resultado = insertar_lectura(
+        nodo_real_id, 45.2, 3.1, "AMARILLO", lectura_cruda_id
+    )
     
     print("Últimas lecturas:", obtener_ultimas_lecturas(3))
     
