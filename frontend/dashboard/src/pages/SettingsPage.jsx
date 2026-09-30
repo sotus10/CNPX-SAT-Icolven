@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { Save, Bell, Waves, Siren, CheckCircle2, MapPin, Mountain, Container } from 'lucide-react';
 import { updateAlertRule } from '../services/api';
-import { APP_ENV, API_URL, WS_URL, STATS_API_URL } from '../config';
+import { APP_ENV, API_URL } from '../config';
 
 const RangeSlider = ({ label, value, onChange, min, max, step = 1, unit = '' }) => (
-  <div className="flex items-center gap-4 py-4">
-    <div className="w-56 shrink-0">
-      <p className="text-[13px] font-semibold text-carbon dark:text-slate-100">{label}</p>
-    </div>
+  <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_4rem] items-center gap-x-3 gap-y-2 py-4">
+    <p className="col-span-2 min-w-0 text-[13px] font-semibold text-carbon dark:text-slate-100">{label}</p>
     <input
       type="range"
       min={min}
@@ -15,9 +13,9 @@ const RangeSlider = ({ label, value, onChange, min, max, step = 1, unit = '' }) 
       step={step}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="flex-1 accent-[#1b59f8]"
+      className="block w-full min-w-0 accent-[#1b59f8]"
     />
-    <span className="w-16 text-right text-[13px] font-bold text-carbon dark:text-slate-100">
+    <span className="w-16 min-w-0 text-right text-[13px] font-bold text-carbon dark:text-slate-100">
       {value}
       {unit}
     </span>
@@ -229,8 +227,9 @@ const SettingsPage = () => {
           <dl className="grid grid-cols-1 gap-3">
             {[
               { label: 'API REST', value: API_URL },
-              { label: 'WebSocket', value: WS_URL },
-              { label: 'API estadística', value: STATS_API_URL },
+              { label: 'Servicio meteorológico', value: `${API_URL}/satelital · Open-Meteo` },
+              { label: 'Historial LoRa', value: `${API_URL}/historial` },
+              { label: 'Alertas SAT', value: `${API_URL}/alertas` },
               { label: 'Entorno', value: APP_ENV },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-[12px] bg-canvas dark:bg-slate-800 border border-line dark:border-slate-700 px-4 py-3">

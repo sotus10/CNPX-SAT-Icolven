@@ -21,11 +21,17 @@ Abre el archivo .env recien creado e ingresa tus claves de proyecto de Supabase:
 
 SUPABASE_URL=https://hnadrkkzucilttlpergc.supabase.co
 SUPABASE_KEY=tu_clave_anonima_publica
+SATELLITE_LATITUDE=6.25
+SATELLITE_LONGITUDE=-75.56
 
 La biblioteca Python usada por este backend (`supabase==2.3.0`) requiere una
 clave JWT `anon` (la clave pública heredada), no una clave con formato
 `sb_publishable_...`. Obtén la clave `anon` desde Supabase en
 **Settings > API > Legacy API Keys** y guárdala únicamente en `backend/.env`.
+
+Las coordenadas `SATELLITE_LATITUDE` y `SATELLITE_LONGITUDE` determinan el punto
+consultado en Open-Meteo. La ruta `GET /satelital` devuelve precipitación horaria
+reciente, actual y pronosticada; no es un pronóstico de nivel o caudal del río.
 
 
 -Ejecución con Docker Compose

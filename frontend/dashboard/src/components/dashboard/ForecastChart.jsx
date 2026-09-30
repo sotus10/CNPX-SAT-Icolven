@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'recharts';
 
-const ForecastChart = ({ data = [], className = '', title = 'Pronóstico', horizon = 7 }) => (
+const ForecastChart = ({ data = [], className = '', title = 'Pronóstico', horizon = 7, observedName = 'Observado', forecastName = 'Pronóstico' }) => (
   <div className={`bg-white dark:bg-slate-900 border border-line dark:border-slate-800 rounded-card shadow-card p-5 ${className}`}>
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
@@ -53,7 +53,7 @@ const ForecastChart = ({ data = [], className = '', title = 'Pronóstico', horiz
             stroke="#1b59f8"
             strokeWidth={2}
             dot={false}
-            name="Observado (m)"
+            name={observedName}
           />
           <Line
             type="monotone"
@@ -62,7 +62,7 @@ const ForecastChart = ({ data = [], className = '', title = 'Pronóstico', horiz
             strokeWidth={2}
             strokeDasharray="6 4"
             dot={false}
-            name="Pronóstico (m)"
+            name={forecastName}
           />
         </LineChart>
       </ResponsiveContainer>

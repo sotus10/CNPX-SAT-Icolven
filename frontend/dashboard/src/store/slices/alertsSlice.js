@@ -49,7 +49,7 @@ const alertsSlice = createSlice({
       state.alerts = action.payload;
       state.loading = false;
       state.error = null;
-      state.unreadCount = action.payload.filter((a) => a.status === 'active').length;
+      state.unreadCount = action.payload.length;
     },
   },
   extraReducers: (builder) => {
@@ -60,7 +60,7 @@ const alertsSlice = createSlice({
       .addCase(loadAlerts.fulfilled, (state, action) => {
         state.loading = false;
         state.alerts = action.payload;
-        state.unreadCount = action.payload.filter((a) => a.status === 'active').length;
+        state.unreadCount = action.payload.length;
       })
       .addCase(loadAlerts.rejected, (state, action) => {
         state.loading = false;

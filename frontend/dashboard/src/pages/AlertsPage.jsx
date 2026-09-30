@@ -1,27 +1,15 @@
 import React, { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  CheckCircle,
   AlertTriangle,
   AlertCircle,
-  X,
-  RotateCcw,
   Info,
-  ShieldCheck,
   Siren,
-  Users,
-  MapPinned,
-  Timer,
+  CloudRain,
   Filter,
+  ShieldCheck,
 } from 'lucide-react';
-import {
-  acknowledgeAlert,
-  resolveAlert,
-  removeAlert,
-} from '../store/slices/alertsSlice';
-import { bootstrapAlerts } from '../services/bootstrap';
-import Select from '../components/ui/Select';
-import { BASINS, mockDispatchSummary } from '../data/mock';
+import { loadAlerts } from '../store/slices/alertsSlice';
 
 const SEVERITY_CONFIG = {
   critical: { Icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', label: 'Crítica' },
@@ -30,7 +18,7 @@ const SEVERITY_CONFIG = {
   low: { Icon: AlertCircle, color: '#3b82f6', bg: '#eff6ff', label: 'Baja' },
 };
 
-const STATUS_LABEL = { active: 'Activa', acknowledged: 'Reconocida', resolved: 'Resuelta' };
+const STATUS_LABEL = { recorded: 'Registrada' };
 
 const timeAgo = (ts) => {
   const diff = Date.now() - ts;
@@ -41,13 +29,6 @@ const timeAgo = (ts) => {
   if (h < 24) return `hace ${h} h`;
   return `hace ${Math.floor(h / 24)} d`;
 };
-
-const filterTabs = [
-  { key: 'active', label: 'Activas' },
-  { key: 'acknowledged', label: 'Reconocidas' },
-  { key: 'resolved', label: 'Resueltas' },
-  { key: 'all', label: 'Todas' },
-];
 
 const SEVERITY_TABS = [
   { key: 'all', label: 'Todas las severidades' },
@@ -60,38 +41,19 @@ const SEVERITY_TABS = [
 const AlertsPage = () => {
   const dispatch = useDispatch();
   const { alerts, loading, error } = useSelector((state) => state.alerts);
-  const [statusFilter, setStatusFilter] = React.useState('active');
   const [severity, setSeverity] = React.useState('all');
-  const [basin, setBasin] = React.useState('all');
 
   useEffect(() => {
-    bootstrapAlerts(dispatch);
+    dispatch(loadAlerts());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const baseScope = useMemo(
-    () =>
-      alerts.filter(
-        (a) =>
-          (severity === 'all' || a.severity === severity) &&
-          (basin === 'all' || a.basin === basin)
-      ),
-    [alerts, severity, basin]
+  const filtered = useMemo(
+    () => alerts.filter((alert) => severity === 'all' || alert.severity === severity),
+    [alerts, severity]
   );
-
-  const filtered = useMemo(() => {
-    if (statusFilter === 'all') return baseScope;
-    return baseScope.filter((a) => a.status === statusFilter);
-  }, [baseScope, statusFilter]);
-
-  const counts = useMemo(
-    () => ({
-      active: baseScope.filter((a) => a.status === 'active').length,
-      acknowledged: baseScope.filter((a) => a.status === 'acknowledged').length,
-      resolved: baseScope.filter((a) => a.status === 'resolved').length,
-    }),
-    [baseScope]
-  );
+  const confirmedCount = alerts.filter((alert) => alert.confirmada_por_satelite).length;
+  const severeCount = alerts.filter((alert) => ['critical', 'high'].includes(alert.severity)).length;
 
   return (
     <div className="space-y-5">
@@ -106,10 +68,10 @@ const AlertsPage = () => {
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
         {[
-          { Icon: Siren, label: 'Sirenas activas', value: mockDispatchSummary.sirensActive, tone: '#dc2626' },
-          { Icon: Users, label: 'Confirmación organismos', value: `${mockDispatchSummary.confirmationRate}%`, tone: '#ea580c' },
-          { Icon: MapPinned, label: 'Zonas de evacuación', value: mockDispatchSummary.evacuatedZones, tone: '#1b59f8' },
-          { Icon: Timer, label: 'Lead time disponible', value: mockDispatchSummary.leadTime, tone: '#f59e0b' },
+          { Icon: Siren, label: 'Alertas registradas', value: alerts.length, tone: '#dc2626' },
+          { Icon: CloudRain, label: 'Confirmadas por satélite', value: confirmedCount, tone: '#1b59f8' },
+          { Icon: AlertTriangle, label: 'Nivel alto o crítico', value: severeCount, tone: '#ea580c' },
+          { Icon: Info, label: 'Estado persistido', value: 'Solo lectura', tone: '#64748b' },
         ].map(({ Icon, label, value, tone }) => (
           <div key={label} className="bg-white dark:bg-slate-900 border border-line dark:border-slate-800 rounded-card shadow-card p-4 flex items-center gap-3">
             <span className="h-9 w-9 shrink-0 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${tone}14`, color: tone }}>
@@ -128,41 +90,11 @@ const AlertsPage = () => {
           <Filter size={13} />
           Mostrar
         </span>
-        <Select value={basin} onChange={(e) => setBasin(e.target.value)}>
-          <option value="all">Todas las cuencas</option>
-          {BASINS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </Select>
+        <span className="text-[13px] font-semibold text-carbon">Fuente: API SAT · Supabase</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {filterTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setStatusFilter(tab.key)}
-              className={`h-9 px-3.5 rounded-[10px] border text-[13px] font-semibold transition-colors ${
-                statusFilter === tab.key
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-white dark:bg-slate-800 border-line dark:border-slate-700 text-[#4d4d4d] dark:text-slate-300 hover:border-primary/40'
-              }`}
-            >
-              {tab.label}
-              {tab.key !== 'all' && (
-                <span className={`ml-1.5 text-[11px] ${statusFilter === tab.key ? 'text-white/80' : 'text-[#a6a6a6]'}`}>
-                  {counts[tab.key]}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        <span className="text-[12px] text-[#a6a6a6] hidden sm:inline">·</span>
-        <div className="flex flex-wrap items-center gap-2">
-          {SEVERITY_TABS.map((tab) => (
+        {SEVERITY_TABS.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -175,8 +107,7 @@ const AlertsPage = () => {
             >
               {tab.label}
             </button>
-          ))}
-        </div>
+        ))}
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-line dark:border-slate-800 rounded-card shadow-card overflow-hidden">
@@ -195,9 +126,9 @@ const AlertsPage = () => {
             <div className="mx-auto h-12 w-12 rounded-full bg-[#f0fdf4] text-[#16a34a] flex items-center justify-center mb-3">
               <ShieldCheck size={22} />
             </div>
-            <p className="text-[14px] font-semibold text-carbon">Sin alertas en este estado</p>
+            <p className="text-[14px] font-semibold text-carbon">Sin alertas registradas</p>
             <p className="text-[13px] text-[#a6a6a6] mt-1">
-              Las estaciones continúan monitoreando cauces y precipitación en segundo plano.
+              No hay registros SAT que coincidan con esta severidad.
             </p>
           </div>
         )}
@@ -226,7 +157,7 @@ const AlertsPage = () => {
                         {config.label}
                       </span>
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#f0f1f6] text-[#4d4d4d]">
-                        {STATUS_LABEL[alert.status]}
+                        {STATUS_LABEL[alert.status] ?? 'Registrada'}
                       </span>
                       {alert.code && (
                         <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
@@ -240,38 +171,8 @@ const AlertsPage = () => {
                         <Info size={11} /> código: {alert.code ?? alert.metric}
                       </span>
                       <span>{timeAgo(alert.timestamp)}</span>
+                      <span>Confirmada por satélite: {alert.confirmada_por_satelite ? 'Sí' : 'No'}</span>
                     </div>
-                  </div>
-
-                  <div className="flex gap-1.5 shrink-0">
-                    {alert.status === 'active' && (
-                      <>
-                        <button
-                          type="button"
-                          title="Reconocer"
-                          onClick={() => dispatch(acknowledgeAlert(alert.id))}
-                          className="h-8 px-2.5 rounded-[8px] border border-line text-[12px] font-semibold text-[#16a34a] hover:bg-[#f0fdf4] transition-colors flex items-center gap-1.5"
-                        >
-                          <CheckCircle size={14} /> Reconocer
-                        </button>
-                        <button
-                          type="button"
-                          title="Resolver"
-                          onClick={() => dispatch(resolveAlert(alert.id))}
-                          className="h-8 px-2.5 rounded-[8px] border border-line text-[12px] font-semibold text-dark hover:bg-canvas transition-colors flex items-center gap-1.5"
-                        >
-                          <RotateCcw size={14} /> Resolver
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      title="Eliminar"
-                      onClick={() => dispatch(removeAlert(alert.id))}
-                      className="h-8 w-8 rounded-[8px] border border-line text-[#a6a6a6] hover:text-[#dc2626] hover:bg-[#fef2f2] transition-colors flex items-center justify-center"
-                    >
-                      <X size={14} />
-                    </button>
                   </div>
                 </li>
               );

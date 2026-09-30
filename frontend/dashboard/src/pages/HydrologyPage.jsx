@@ -1,60 +1,63 @@
 import React, { useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Download, Filter, Waves, Gauge, CloudRain, Zap, Database, TrendingUp } from 'lucide-react';
+import { CloudRain, Filter, Gauge, Waves } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import ActivityChart from '../components/dashboard/ActivityChart';
 import AlertPanel from '../components/dashboard/AlertPanel';
 import Select from '../components/ui/Select';
-import { bootstrapDashboard } from '../services/bootstrap';
-import { STATIONS, getHydrologyKpis, getStationSeries } from '../data/mock';
-
-const KPI_ICONS = {
-  river_level: Waves,
-  rise_rate: TrendingUp,
-  discharge: Gauge,
-  rainfall_24h: CloudRain,
-  rain_intensity: Zap,
-  reservoir: Database,
-};
+import useSatData from '../hooks/useSatData';
 
 const PERIOD_OPTIONS = [
-  { key: '24h', label: 'Últimas 24 horas' },
-  { key: '7d', label: 'Últimos 7 días' },
-  { key: '30d', label: 'Últimos 30 días' },
+  { key: 24, label: 'Últimas 24 horas' },
+  { key: 48, label: 'Últimas 48 horas' },
 ];
 
-const PERIOD_CHANGE_LABEL = {
-  '24h': 'vs últimas 24 h',
-  '7d': 'vs semana anterior',
-  '30d': 'vs últimos 30 días',
-};
+const hourLabel = (value) => value?.slice(11, 16) ?? '';
 
 const HydrologyPage = () => {
-  const dispatch = useDispatch();
-  const kpis = useSelector((state) => state.dashboard.kpis);
+  const [period, setPeriod] = useState(24);
+  const { satellite, readings, errors, loading, lastUpdated } = useSatData();
+  const latestReading = readings[0];
 
-  const [station, setStation] = useState('paso-castro');
-  const [period, setPeriod] = useState('24h');
+  const displayedKpis = useMemo(() => [
+    {
+      id: 'rain-now', label: 'Precipitación actual',
+      value: satellite?.current?.precipitation_mm ?? '—', unit: 'mm',
+      icon: CloudRain, subtext: satellite ? 'Open-Meteo · hora actual' : 'Esperando respuesta de Open-Meteo',
+    },
+    {
+      id: 'rain-24h', label: 'Precipitación acumulada · 24 h',
+      value: satellite?.accumulated_24h_mm ?? '—', unit: 'mm',
+      icon: CloudRain, subtext: 'Acumulado horario de Open-Meteo',
+    },
+    {
+      id: 'sensor-distance', label: 'Distancia sensor–agua',
+      value: latestReading?.distancia_cm ?? '—', unit: 'cm',
+      icon: Waves, subtext: latestReading ? `Lectura ${latestReading.timestamp}` : 'Sin lecturas guardadas en SAT',
+    },
+    {
+      id: 'sensor-speed', label: 'Velocidad registrada',
+      value: latestReading?.velocidad_cm_min ?? '—', unit: 'cm/min',
+      icon: Gauge, subtext: latestReading ? 'Dato del sensor LoRa' : 'Sin lecturas guardadas en SAT',
+    },
+  ], [satellite, latestReading]);
 
-  React.useEffect(() => {
-    bootstrapDashboard(dispatch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const stationRef = STATIONS.find((s) => s.id === station) ?? STATIONS[0];
-
-  const displayedKpis = useMemo(
-    () =>
-      getHydrologyKpis(station).map((k) => ({
-        ...k,
-        icon: KPI_ICONS[k.id],
-        changeLabel: PERIOD_CHANGE_LABEL[period],
-      })),
-    [station, period]
+  const rainfallSeries = useMemo(
+    () => (satellite?.hourly ?? [])
+      .filter((point) => !point.is_forecast)
+      .slice(-period)
+      .map((point) => ({ label: hourLabel(point.time), value: point.precipitation_mm, active: true })),
+    [satellite, period]
   );
 
-  const chartData = useMemo(() => getStationSeries(station, period), [station, period]);
-  const periodLabel = PERIOD_OPTIONS.find((o) => o.key === period)?.label ?? 'Últimas 24 horas';
+  const sensorSeries = useMemo(
+    () => readings.slice(0, period).reverse().map((reading) => ({
+      label: hourLabel(reading.timestamp),
+      value: Number(reading.distancia_cm),
+      active: true,
+    })),
+    [readings, period]
+  );
+  const periodLabel = PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? 'Últimas 24 horas';
 
   return (
     <div className="space-y-5">
@@ -62,16 +65,12 @@ const HydrologyPage = () => {
         <div>
           <h1 className="text-[22px] font-bold tracking-tight text-carbon">Hidrología y Pluviometría</h1>
           <p className="text-[13px] text-[#a6a6a6] mt-0.5">
-            Estaciones limnimétricas, caudal y precipitación en tiempo real
+            Telemetría LoRa y precipitación de Open-Meteo para la ubicación del SAT
           </p>
         </div>
-        <button
-          type="button"
-          className="flex items-center gap-2 h-10 px-4 rounded-[10px] bg-primary text-white text-[13px] font-semibold shadow-sm hover:bg-primary-700 transition-colors"
-        >
-          <Download size={16} />
-          Descargar reporte
-        </button>
+        <span className="text-[12px] text-[#808080]">
+          {loading ? 'Actualizando datos…' : lastUpdated ? `Actualizado ${lastUpdated.toLocaleTimeString('es-CO')}` : 'Sin conexión'}
+        </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -79,15 +78,8 @@ const HydrologyPage = () => {
           <Filter size={13} />
           Mostrar
         </span>
-        <Select value={station} onChange={(e) => setStation(e.target.value)}>
-          {STATIONS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </Select>
-        <span className="text-[12px] text-[#a6a6a6]">·</span>
-        <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
+        <span className="text-[13px] font-semibold text-carbon">Nodo SAT · ubicación configurada</span>
+        <Select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
           {PERIOD_OPTIONS.map((opt) => (
             <option key={opt.key} value={opt.key}>
               {opt.label}
@@ -102,14 +94,32 @@ const HydrologyPage = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)] gap-5">
+      {(errors.satellite || errors.readings) && (
+        <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          {errors.satellite && `Open-Meteo: ${errors.satellite}. `}
+          {errors.readings && `Lecturas SAT: ${errors.readings}`}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <ActivityChart
-          data={chartData}
-          title={`Evolución del nivel (m) · ${stationRef.name}`}
+          data={rainfallSeries}
+          title="Precipitación horaria · Open-Meteo (mm)"
           range={periodLabel}
-          className="col-span-1"
         />
-        <AlertPanel basin={stationRef.basin} />
+        <ActivityChart
+          data={sensorSeries}
+          title="Distancia sensor–agua · LoRa (cm)"
+          range={periodLabel}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <AlertPanel />
+        <div className="rounded-card border border-line bg-white p-5 text-[13px] text-[#808080] shadow-card dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+          La precipitación proviene de Open-Meteo. Distancia y velocidad son lecturas directas
+          almacenadas por el sensor SAT; no se infiere nivel de río ni caudal a partir de la distancia.
+        </div>
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ const KPICard = ({ kpi, onClick }) => {
     label,
     value,
     unit = '',
-    change = 0,
+    change = null,
     changeLabel = '',
     status = 'neutral',
     subtext = '',
@@ -62,13 +62,15 @@ const KPICard = ({ kpi, onClick }) => {
         {unit && <span className="text-[13px] font-semibold text-[#808080] dark:text-slate-400">{unit}</span>}
       </div>
 
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold">
-        <TrendIcon status={status} />
-        <span className={trendColor === '#16a34a' ? 'text-[#16a34a]' : trendColor === '#dc2626' ? 'text-[#dc2626]' : 'text-[#808080]'}>
-          {Math.abs(change)}%
-        </span>
-        {changeLabel && <span className="text-[#a6a6a6] dark:text-slate-400 font-normal">{changeLabel}</span>}
-      </div>
+      {change !== null && (
+        <div className="flex items-center gap-1.5 text-[12px] font-semibold">
+          <TrendIcon status={status} />
+          <span className={trendColor === '#16a34a' ? 'text-[#16a34a]' : trendColor === '#dc2626' ? 'text-[#dc2626]' : 'text-[#808080]'}>
+            {Math.abs(change)}%
+          </span>
+          {changeLabel && <span className="text-[#a6a6a6] dark:text-slate-400 font-normal">{changeLabel}</span>}
+        </div>
+      )}
 
       {subtext && <span className="text-[12px] text-[#a6a6a6] dark:text-slate-400">{subtext}</span>}
 

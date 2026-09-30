@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # Importaciones existentes del clima y cliente
-from clima import obtener_clima
+from clima import obtener_clima, obtener_datos_satelitales
 from supabase_client import supabase
 
 # Importamos las funciones CRUD que ya probamos y funcionan
@@ -14,8 +14,8 @@ from crud import obtener_ultima_lectura, obtener_ultimas_lecturas, obtener_alert
 
 load_dotenv(Path(__file__).with_name(".env"))
 
-LATITUD = 6.25
-LONGITUD = -75.56
+LATITUD = float(os.getenv("SATELLITE_LATITUDE", "6.25"))
+LONGITUD = float(os.getenv("SATELLITE_LONGITUDE", "-75.56"))
 
 def obtener_datos_sensor_y_clima():
     # Consulta de los datos del clima
@@ -75,6 +75,18 @@ def read_root():
         "supabase_connected": supabase is not None
     }
 
+
+@app.get("/satelital")
+def get_datos_satelitales(
+    latitud: float = Query(LATITUD, ge=-90, le=90),
+    longitud: float = Query(LONGITUD, ge=-180, le=180),
+):
+    """Devuelve precipitación horaria histórica, actual y pronosticada de Open-Meteo."""
+    datos = obtener_datos_satelitales(latitud, longitud)
+    if datos is None:
+        raise HTTPException(status_code=502, detail="No fue posible consultar Open-Meteo.")
+    return datos
+
 # ==========================================
 # NUEVOS ENDPOINTS DE LA TAREA 11
 # ==========================================
@@ -82,6 +94,8 @@ def read_root():
 @app.get("/ultima-lectura")
 def get_ultima_lectura():
     """Devuelve la medición más reciente registrada por el sensor."""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Supabase no está configurado para consultar lecturas.")
     resultado = obtener_ultima_lectura()
     if not resultado:
         raise HTTPException(status_code=404, detail="No se encontró ninguna lectura reciente.")
@@ -90,11 +104,15 @@ def get_ultima_lectura():
 @app.get("/historial")
 def get_historial(limite: int = 10):
     """Devuelve el historial de lecturas recientes."""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Supabase no está configurado para consultar lecturas.")
     resultado = obtener_ultimas_lecturas(limite=limite)
     return resultado
 
 @app.get("/alertas")
 def get_alertas(limite: int = 10):
     """Devuelve el registro de alertas generadas en el sistema."""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Supabase no está configurado para consultar alertas.")
     resultado = obtener_alertas(limite=limite)
     return resultado

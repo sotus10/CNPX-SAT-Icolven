@@ -33,6 +33,21 @@ export const fetchMetrics = async (params = {}) => {
   return data;
 };
 
+export const fetchSatelliteData = async (params = {}) => {
+  const { data } = await apiClient.get('/satelital', { params });
+  return data;
+};
+
+export const fetchSensorHistory = async (limit = 48) => {
+  const { data } = await apiClient.get('/historial', { params: { limite: limit } });
+  return data;
+};
+
+export const fetchLatestSensorReading = async () => {
+  const { data } = await apiClient.get('/ultima-lectura');
+  return data;
+};
+
 export const fetchBasinStatus = async (basinId) => {
   const { data } = await apiClient.get(`/stations/${basinId}`);
   return data;
@@ -68,9 +83,31 @@ export const fetchCommsStatus = async () => {
   return data;
 };
 
-export const fetchAlerts = async (status = 'active') => {
-  const { data } = await apiClient.get('/alerts', { params: { status } });
-  return data;
+export const fetchAlerts = async () => {
+  const { data } = await apiClient.get('/alertas', { params: { limite: 100 } });
+  return data.map((alert) => {
+    const level = String(alert.nivel_final ?? 'VERDE').toUpperCase();
+    const severity = {
+      ROJO: 'critical',
+      NARANJA: 'high',
+      AMARILLO: 'medium',
+      VERDE: 'low',
+    }[level] ?? 'low';
+
+    return {
+      ...alert,
+      id: alert.id ?? alert.lectura_id,
+      title: `Alerta ${level}`,
+      description: alert.confirmada_por_satelite
+        ? 'Alerta registrada y confirmada con datos satelitales.'
+        : 'Alerta registrada; no figura confirmación satelital.',
+      severity,
+      status: 'recorded',
+      timestamp: Date.parse(alert.timestamp) || Date.now(),
+      metric: 'nivel_final',
+      code: level,
+    };
+  });
 };
 
 export const updateAlertRule = async (id, payload) => {

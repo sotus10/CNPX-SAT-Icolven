@@ -1,34 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Download, FileText, Filter, Siren, MapPin, Users, Radio, Waves, Droplets } from 'lucide-react';
-import { generateReport } from '../services/api';
+import { Download, Filter, CloudRain, Gauge, Waves, Bell } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import ActivityChart from '../components/dashboard/ActivityChart';
-import Leaderboard from '../components/dashboard/Leaderboard';
 import Select from '../components/ui/Select';
-import { bootstrapDashboard } from '../services/bootstrap';
-import {
-  BASINS,
-  mockLeaderboardGroups,
-  mockLeaderboardUsers,
-  getBasinKpis,
-  getLevelTrend,
-  filterLeaderboard,
-  PERIOD_SELECT_OPTIONS,
-  PERIOD_CHANGE_LABEL,
-} from '../data/mock';
+import useSatData from '../hooks/useSatData';
 import { jsPDF } from 'jspdf';
 
-const KPI_ICONS = {
-  cuencas_alert: Siren,
-  stations_critical: MapPin,
-  population_at_risk: Users,
-  network_online: Radio,
-  mean_streamflow: Waves,
-  api_saturation: Droplets,
-};
+const PERIOD_OPTIONS = [
+  { key: 24, label: 'Últimas 24 horas' },
+  { key: 48, label: 'Últimas 48 horas' },
+];
+
+const hourLabel = (value) => value?.slice(11, 16) ?? '';
 
 const exportCSV = (rows) => {
+  if (!rows.length) return;
   const header = Object.keys(rows[0]);
   const csv = [header.join(';'), ...rows.map((r) => header.map((h) => r[h]).join(';'))].join('\n');
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
@@ -43,55 +29,50 @@ const exportCSV = (rows) => {
 const exportPDF = (rows) => {
   const doc = new jsPDF();
   doc.setFontSize(16);
-  doc.text('Reporte de Cuencas', 14, 20);
+  doc.text('Reporte de datos SAT', 14, 20);
   doc.setFontSize(11);
   doc.setTextColor(120);
   doc.text(new Date().toLocaleString('es-AR'), 14, 27);
   doc.setTextColor(21, 30, 35);
   doc.setFontSize(12);
-  rows.forEach((r, i) => {
-    doc.text(`${r.periodo ?? r.label} — ${r.metrica ?? r.value}`, 14, 36 + i * 6);
+  rows.slice(0, 40).forEach((row, index) => {
+    const content = Object.entries(row).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ');
+    doc.text(content, 14, 36 + index * 6, { maxWidth: 180 });
   });
   doc.save('reporte-cuencas.pdf');
 };
 
 const ReportsPage = () => {
-  const dispatch = useDispatch();
-  const kpis = useSelector((state) => state.dashboard.kpis);
+  const [period, setPeriod] = useState(24);
+  const { satellite, readings, alerts, errors, loading, lastUpdated } = useSatData();
+  const latestReading = readings[0];
 
-  const [period, setPeriod] = useState('year');
-  const [basin, setBasin] = useState('all');
+  const displayedKpis = useMemo(() => [
+    { id: 'rainfall', label: 'Precipitación acumulada · 24 h', value: satellite?.accumulated_24h_mm ?? '—', unit: 'mm', icon: CloudRain, subtext: 'Open-Meteo' },
+    { id: 'reading-count', label: 'Lecturas SAT recibidas', value: readings.length, unit: '', icon: Waves, subtext: 'Registros disponibles en el historial' },
+    { id: 'distance', label: 'Última distancia sensor–agua', value: latestReading?.distancia_cm ?? '—', unit: 'cm', icon: Gauge, subtext: latestReading?.timestamp ?? 'Sin lectura disponible' },
+    { id: 'alert-count', label: 'Alertas SAT registradas', value: alerts.length, unit: '', icon: Bell, subtext: `${alerts.filter((alert) => alert.confirmada_por_satelite).length} confirmadas por satélite` },
+  ], [satellite, readings, latestReading, alerts]);
 
-  React.useEffect(() => {
-    bootstrapDashboard(dispatch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const displayedKpis = useMemo(() => {
-    const base = basin === 'all' && kpis.length > 0 ? kpis : getBasinKpis(basin);
-    return base.map((k) => ({
-      ...k,
-      icon: KPI_ICONS[k.id] ?? k.icon,
-      changeLabel: PERIOD_CHANGE_LABEL[period],
-    }));
-  }, [kpis, basin, period]);
-
-  const trend = useMemo(() => getLevelTrend(basin, period), [basin, period]);
-  const leaderGroups = useMemo(() => filterLeaderboard(mockLeaderboardGroups, basin), [basin]);
-  const leaderStations = useMemo(() => filterLeaderboard(mockLeaderboardUsers, basin), [basin]);
+  const trend = useMemo(
+    () => (satellite?.hourly ?? []).filter((point) => !point.is_forecast).slice(-period).map((point) => ({
+      label: hourLabel(point.time), value: point.precipitation_mm, active: true,
+    })),
+    [satellite, period]
+  );
 
   const handleExport = async (format) => {
-    const rows = trend.map((a) => ({ periodo: a.label, metrica: 'nivel (m)', valor: a.value }));
-    try {
-      await generateReport({ format, start_date: null, end_date: null });
-    } catch (error) {
-      console.warn('[reports] backend no disponible, generando export local');
-    }
+    const cutoff = Date.now() - period * 60 * 60 * 1000;
+    const rows = [
+      ...readings.slice(0, period).map((reading) => ({ tipo: 'sensor', fecha: reading.timestamp, distancia_cm: reading.distancia_cm, velocidad_cm_min: reading.velocidad_cm_min ?? '', precipitacion_mm: '', nivel: '', confirmada_por_satelite: '' })),
+      ...trend.map((point) => ({ tipo: 'precipitacion_open_meteo', fecha: point.label, distancia_cm: '', velocidad_cm_min: '', precipitacion_mm: point.value, nivel: '', confirmada_por_satelite: '' })),
+      ...alerts.filter((alert) => alert.timestamp >= cutoff).map((alert) => ({ tipo: 'alerta', fecha: new Date(alert.timestamp).toISOString(), distancia_cm: '', velocidad_cm_min: '', precipitacion_mm: '', nivel: alert.nivel_final, confirmada_por_satelite: alert.confirmada_por_satelite })),
+    ];
     if (format === 'csv') exportCSV(rows);
     if (format === 'pdf') exportPDF(rows);
   };
 
-  const periodLabel = PERIOD_SELECT_OPTIONS.find((o) => o.key === period)?.label ?? 'Este año';
+  const periodLabel = PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? 'Últimas 24 horas';
 
   return (
     <div className="space-y-5">
@@ -99,7 +80,7 @@ const ReportsPage = () => {
         <div>
           <h1 className="text-[22px] font-bold tracking-tight text-carbon">Reportes</h1>
           <p className="text-[13px] text-[#a6a6a6] mt-0.5">
-            Resumen ejecutivo con indicadores hidrológicos y actividad de alertas de cuencas
+            Exportación de datos recibidos por SAT y precipitación de Open-Meteo
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -121,26 +102,23 @@ const ReportsPage = () => {
         </div>
       </div>
 
+      <p className="text-[12px] text-[#808080]">
+        {loading ? 'Actualizando datos…' : lastUpdated ? `Fuente API SAT · actualizado ${lastUpdated.toLocaleTimeString('es-CO')}` : 'Sin conexión con la API SAT'}
+      </p>
+
       <div className="flex flex-wrap items-center gap-3">
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#808080]">
           <Filter size={13} />
           Mostrar
         </span>
-        <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
-          {PERIOD_SELECT_OPTIONS.map((opt) => (
+        <Select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
+          {PERIOD_OPTIONS.map((opt) => (
             <option key={opt.key} value={opt.key}>
               {opt.label}
             </option>
           ))}
         </Select>
-        <Select value={basin} onChange={(e) => setBasin(e.target.value)}>
-          <option value="all">Todas las cuencas</option>
-          {BASINS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </Select>
+        <span className="text-[13px] font-semibold text-carbon">Ubicación SAT configurada</span>
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-3 gap-5">
@@ -149,27 +127,20 @@ const ReportsPage = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <ActivityChart
-          data={trend}
-          title="Evolución de niveles (semanal)"
-          range={periodLabel}
-        />
-        <div className="bg-white dark:bg-slate-900 border border-line dark:border-slate-800 rounded-card shadow-card p-5 flex flex-col justify-center items-center gap-2 text-center">
-          <FileText size={28} className="text-primary" />
-          <p className="text-[14px] font-semibold text-carbon dark:text-slate-100">Modelos estadísticos</p>
-          <p className="text-[13px] text-[#a6a6a6] dark:text-slate-400">
-            Muskingum, ARIMA/Prophet e índices API se ejecutan en el backend de
-            estadística (REACT_APP_STATS_API). Esta vista muestra el desglose por
-            cuenca cuando estén disponibles.
-          </p>
-        </div>
-      </div>
+      {(errors.satellite || errors.readings || errors.alerts) && (
+        <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          {errors.satellite && `Open-Meteo: ${errors.satellite}. `}
+          {errors.readings && `Lecturas: ${errors.readings}. `}
+          {errors.alerts && `Alertas: ${errors.alerts}`}
+        </p>
+      )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <Leaderboard title="Ríos monitoreados" rows={leaderGroups} />
-        <Leaderboard title="Estaciones críticas" rows={leaderStations} />
-      </div>
+      <ActivityChart data={trend} title="Precipitación horaria Open-Meteo (mm)" range={periodLabel} />
+      <ActivityChart
+        data={readings.slice(0, period).reverse().map((reading) => ({ label: hourLabel(reading.timestamp), value: Number(reading.distancia_cm), active: true }))}
+        title="Distancia sensor–agua LoRa (cm)"
+        range={periodLabel}
+      />
     </div>
   );
 };

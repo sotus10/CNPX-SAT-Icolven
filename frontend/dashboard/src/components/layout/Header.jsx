@@ -47,8 +47,8 @@ const Header = () => {
           className="hidden lg:flex items-center gap-1.5 text-[11px] font-medium text-[#4d4d4d] dark:text-slate-300"
           aria-live="polite"
         >
-          <span className="text-[#16a34a]" aria-hidden="true">●</span>
-          <span>Telemetría en vivo</span>
+          <span className="text-[#1b59f8]" aria-hidden="true">●</span>
+          <span>API SAT · consulta periódica</span>
           <span className="text-[#a6a6a6] dark:text-slate-500">|</span>
           <span>Actualizado: {timestamp}</span>
         </div>
