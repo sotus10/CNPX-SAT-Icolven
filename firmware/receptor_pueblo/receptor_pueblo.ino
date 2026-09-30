@@ -42,6 +42,7 @@
   const char* WIFI_SSID     = "NOMBRE_DE_LA_RED";
   const char* WIFI_PASSWORD = "CONTRASENA_AQUI";
   const char* BACKEND_URL   = "http://tu-backend.example.com/api/lecturas";
+  const char* BACKEND_API_KEY = "CONFIGURAR_API_KEY_DEL_NODO";
 #endif
 
 // ----------------------------------------------------------------------------
@@ -236,6 +237,7 @@ void subirABackend(const String &nodo, const String &nivel, float distancia, flo
   HTTPClient http;
   http.begin(BACKEND_URL);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-API-Key", BACKEND_API_KEY);
 
   String json = "{\"nodo_id\":\"" + nodo + "\",\"nivel\":\"" + nivel +
                 "\",\"distancia_cm\":" + String(distancia, 1) +

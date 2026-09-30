@@ -1,97 +1,86 @@
-"""
-Pruebas manuales de limpieza.py (mismo estilo que test_crud.py).
-Ejecutar con:  python test_limpieza.py
-"""
+import unittest
 
 from limpieza import limpiar_lectura
 
-fallos = 0
+
+class LimpiarLecturaTests(unittest.TestCase):
+    def setUp(self):
+        self.datos = {
+            "nodo_id": " RIO_01 ",
+            "distancia_cm": 45.26,
+            "velocidad_cm_min": 3.141,
+            "nivel": "amarillo",
+        }
+
+    def test_normaliza_y_redondea_lectura_valida(self):
+        self.assertEqual(
+            limpiar_lectura(self.datos),
+            {
+                "nodo_id": "RIO_01",
+                "distancia_cm": 45.3,
+                "velocidad_cm_min": 3.14,
+                "nivel": "AMARILLO",
+            },
+        )
+
+    def test_acepta_alias_legacy_nodo_y_normaliza_nivel(self):
+        datos = {
+            "nodo": "  nodo-7  ",
+            "distancia_cm": 120.456,
+            "velocidad_cm_min": 1.2345,
+            "nivel": " naranja ",
+        }
+        self.assertEqual(
+            limpiar_lectura(datos),
+            {
+                "nodo_id": "nodo-7",
+                "distancia_cm": 120.5,
+                "velocidad_cm_min": 1.23,
+                "nivel": "NARANJA",
+            },
+        )
+
+    def test_rechaza_distancia_fuera_de_rango(self):
+        self.datos["distancia_cm"] = 500
+        with self.assertRaisesRegex(ValueError, "distancia_cm"):
+            limpiar_lectura(self.datos)
+
+    def test_rechaza_nivel_invalido(self):
+        self.datos["nivel"] = "AZUL"
+        with self.assertRaisesRegex(ValueError, "nivel"):
+            limpiar_lectura(self.datos)
+
+    def test_rechaza_velocidad_fuera_de_rango(self):
+        self.datos["velocidad_cm_min"] = 9999
+        with self.assertRaisesRegex(ValueError, "velocidad_cm_min"):
+            limpiar_lectura(self.datos)
+
+    def test_rechaza_nodo_vacio(self):
+        self.datos["nodo_id"] = "  "
+        with self.assertRaisesRegex(ValueError, "nodo_id"):
+            limpiar_lectura(self.datos)
+
+    def test_rechaza_valores_no_finitos(self):
+        self.datos["distancia_cm"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "distancia_cm"):
+            limpiar_lectura(self.datos)
+
+    def test_rechaza_falta_un_campo(self):
+        del self.datos["velocidad_cm_min"]
+        with self.assertRaisesRegex(ValueError, "velocidad_cm_min"):
+            limpiar_lectura(self.datos)
+
+    def test_rechaza_entrada_no_dict(self):
+        with self.assertRaisesRegex(ValueError, "objeto JSON"):
+            limpiar_lectura("hola")
+
+    def test_no_modifica_el_diccionario_original(self):
+        original = {"nodo_id": " RIO_01 ", "distancia_cm": 120.0, "velocidad_cm_min": 1.5, "nivel": "naranja"}
+        limpiado = limpiar_lectura(original)
+        self.assertEqual(limpiado["nivel"], "NARANJA")
+        self.assertEqual(original["nivel"], "naranja")
 
 
-def lectura_valida(**cambios) -> dict:
-    """Lectura correcta de base; cada prueba cambia solo lo que quiere probar."""
-    datos = {
-        "nodo": "nodo-1",
-        "distancia_cm": 120.0,
-        "velocidad_cm_min": 1.5,
-        "nivel": "VERDE",
-    }
-    datos.update(cambios)
-    return datos
+if __name__ == "__main__":
+    unittest.main()
 
-
-def debe_pasar(descripcion: str, datos: dict, esperado: dict = None) -> None:
-    global fallos
-    try:
-        resultado = limpiar_lectura(datos)
-    except ValueError as e:
-        print(f"[FALLO] {descripcion}: lanzó error inesperado: {e}")
-        fallos += 1
-        return
-    if esperado is not None and resultado != esperado:
-        print(f"[FALLO] {descripcion}: se esperaba {esperado} y salió {resultado}")
-        fallos += 1
-        return
-    print(f"[OK] {descripcion}")
-
-
-def debe_fallar(descripcion: str, datos: dict, mencion: str) -> None:
-    global fallos
-    try:
-        limpiar_lectura(datos)
-    except ValueError as e:
-        if mencion in str(e):
-            print(f"[OK] {descripcion}: {e}")
-        else:
-            print(f"[FALLO] {descripcion}: el error no menciona '{mencion}': {e}")
-            fallos += 1
-        return
-    print(f"[FALLO] {descripcion}: debió lanzar un error y no lo hizo")
-    fallos += 1
-
-
-# --- Los 6 casos mínimos del Paso 5 ---
-debe_pasar("1. Lectura 100% válida", lectura_valida())
-debe_fallar("2. distancia_cm fuera de rango", lectura_valida(distancia_cm=500), "distancia_cm")
-debe_fallar("3. nivel inválido", lectura_valida(nivel="AZUL"), "nivel")
-debe_fallar("4. velocidad absurda", lectura_valida(velocidad_cm_min=9999), "velocidad_cm_min")
-debe_fallar("5. nodo vacío", lectura_valida(nodo=""), "nodo")
-debe_pasar(
-    "6. nivel en minúscula se normaliza",
-    lectura_valida(nivel="naranja"),
-    esperado=lectura_valida(nivel="NARANJA"),
-)
-
-# --- Casos extra (bordes y datos corruptos) ---
-debe_fallar("7. nodo solo espacios", lectura_valida(nodo="   "), "nodo")
-debe_fallar("8. distancia NaN", lectura_valida(distancia_cm=float("nan")), "distancia_cm")
-debe_fallar("9. distancia infinita", lectura_valida(distancia_cm=float("inf")), "distancia_cm")
-debe_fallar("10. distancia como texto", lectura_valida(distancia_cm="120"), "distancia_cm")
-debe_fallar("11. distancia None", lectura_valida(distancia_cm=None), "distancia_cm")
-debe_fallar("12. distancia bajo el mínimo", lectura_valida(distancia_cm=1), "distancia_cm")
-debe_pasar("13. distancia en el límite inferior", lectura_valida(distancia_cm=2))
-debe_pasar("14. distancia en el límite superior", lectura_valida(distancia_cm=450))
-debe_fallar("15. falta un campo", {"nodo": "nodo-1", "distancia_cm": 100}, "Faltan campos")
-debe_fallar("16. entrada que no es diccionario", "hola", "diccionario")
-debe_pasar(
-    "17. redondeo",
-    lectura_valida(distancia_cm=120.456, velocidad_cm_min=1.2345),
-    esperado=lectura_valida(distancia_cm=120.5, velocidad_cm_min=1.23),
-)
-debe_pasar(
-    "18. espacios alrededor del nodo y del nivel",
-    lectura_valida(nodo="  nodo-1  ", nivel=" rojo "),
-    esperado=lectura_valida(nodo="nodo-1", nivel="ROJO"),
-)
-
-# El diccionario original no debe modificarse
-original = lectura_valida(nivel="naranja")
-limpiar_lectura(original)
-if original["nivel"] == "naranja":
-    print("[OK] 19. No modifica el diccionario original")
-else:
-    print("[FALLO] 19. Modificó el diccionario original")
-    fallos += 1
-
-print()
-print("Todas las pruebas pasaron." if fallos == 0 else f"{fallos} prueba(s) fallaron.")
