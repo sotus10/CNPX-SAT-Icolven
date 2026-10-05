@@ -55,7 +55,7 @@ void setup() {
   // Inicializar pines del sensor
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
-  digitalWait(TRIG_PIN, LOW); // Nota: corregido a digitalWrite abajo
+  digitalWrite(TRIG_PIN, LOW); // Nota: corregido a digitalWrite abajo
 
   // Inicializar comunicación I2C (SDA=21, SCL=22)
   Wire.begin(21, 22);
@@ -94,7 +94,7 @@ void loop() {
   unsigned long tiempoActual = millis();
   
   if (distancia > 0 && ultimaDistancia > 0) {
-    float deltaDistancia = distancia - ultimaDistancia; // Positivo = baja el agua, Negativo = sube el agua
+    float deltaDistancia = ultimaDistancia - distancia; // Positivo = baja el agua, Negativo = sube el agua
     float deltaTimeMinutos = (tiempoActual - ultimoTiempoMs) / 60000.0;
     if (deltaTimeMinutos > 0) {
       velocidad = deltaDistancia / deltaTimeMinutos;
