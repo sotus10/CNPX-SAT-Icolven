@@ -15,6 +15,7 @@ import { Equipo } from "@/components/Equipo";
 import { Cierre, Footer } from "@/components/Cierre";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { Divider } from "@/components/ui/primitives";
+import { API_BASE } from "@/lib/api";
 import type { SatelliteData } from "@/components/DatosSatelitales";
 
 const TITLE = "Cauce · Sistema de alerta temprana de crecientes con LoRa";
@@ -23,9 +24,8 @@ const DESC =
 
 export const Route = createFileRoute("/")({
   loader: async (): Promise<SatelliteData | null> => {
-    const apiBase = (import.meta.env.VITE_SAT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
     try {
-      const response = await fetch(`${apiBase}/satelital`);
+      const response = await fetch(`${API_BASE}/satelital`);
       if (!response.ok) return null;
       return (await response.json()) as SatelliteData;
     } catch {

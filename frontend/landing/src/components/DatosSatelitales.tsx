@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, CloudRain, MapPin, RefreshCw, Satellite, Signal } from "lucide-react";
 import { Eyebrow } from "@/components/ui/primitives";
+import { API_BASE, REFRESH_INTERVAL } from "@/lib/api";
 
 type HourlyRain = {
   time: string;
@@ -20,9 +21,6 @@ export type SatelliteData = {
   accumulated_24h_mm: number;
   hourly: HourlyRain[];
 };
-
-const API_BASE = (import.meta.env.VITE_SAT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
-const REFRESH_INTERVAL = 5 * 60 * 1000;
 
 function formatTime(value: string) {
   return value.slice(11, 16);
@@ -90,7 +88,7 @@ export function DatosSatelitales({ initialData = null }: { initialData?: Satelli
   const [loading, setLoading] = useState(initialData === null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-  const loadData = useCallback(async (signal?: AbortSignal) => {
+  const loadData = useCallback(async (signal: AbortSignal | null = null) => {
     try {
       const response = await fetch(`${API_BASE}/satelital`, { signal, cache: "no-store" });
       if (!response.ok) throw new Error(`La API respondió con el estado ${response.status}.`);

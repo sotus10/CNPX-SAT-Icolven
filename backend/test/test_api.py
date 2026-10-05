@@ -165,5 +165,63 @@ class LecturasApiTests(unittest.TestCase):
         historial.assert_called_once_with(limite=75)
 
 
+class GraficasApiTests(unittest.TestCase):
+    """Las cuatro consultas que consumen las gráficas 1, 3, 5, 7 y 8."""
+
+    def setUp(self):
+        self.client = TestClient(main.app)
+
+    def test_configuracion_devuelve_los_umbrales_de_peligro(self):
+        configuracion = [
+            {
+                "nodo_id": "node-uuid",
+                "umbral_amarillo_cm": "80.00",
+                "umbral_naranja_cm": "50.00",
+                "umbral_rojo_cm": "30.00",
+                "limite_velocidad_cm_min": "5.00",
+            }
+        ]
+        with patch.object(main, "obtener_configuracion_nodos", return_value=configuracion):
+            respuesta = self.client.get("/configuracion")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["data"], configuracion)
+
+    def test_lecturas_crudas_pasa_limite_y_nodo(self):
+        with patch.object(main, "obtener_lecturas_crudas", return_value=[{"id": "raw"}]) as crudas:
+            respuesta = self.client.get("/lecturas-crudas?limite=250&nodo_id=node-uuid")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["total"], 1)
+        crudas.assert_called_once_with(limite=250, nodo_id="node-uuid")
+
+    def test_lecturas_crudas_rechaza_limite_fuera_de_rango(self):
+        respuesta = self.client.get("/lecturas-crudas?limite=5000")
+        self.assertEqual(respuesta.status_code, 422)
+
+    def test_nodos_cruza_patron_con_ultima_lectura(self):
+        nodos = [{"id": "node-uuid", "nombre": "RIO_01", "ubicacion": None, "estado": "activo"}]
+        lecturas = [{"nodo_id": "node-uuid", "timestamp": "2026-09-23T14:59:00+00:00"}]
+        with patch.object(main, "obtener_nodos", return_value=nodos):
+            with patch.object(main, "obtener_lecturas_limpias_por_nodo", return_value=lecturas):
+                respuesta = self.client.get("/nodos")
+        self.assertEqual(respuesta.status_code, 200)
+        evaluados = respuesta.json()["data"]
+        self.assertEqual(len(evaluados), 1)
+        self.assertIn("conectividad", evaluados[0])
+        self.assertEqual(evaluados[0]["nombre"], "RIO_01")
+
+    def test_nodos_devuelve_500_si_supabase_falla(self):
+        with patch.object(main, "obtener_nodos", side_effect=RuntimeError):
+            respuesta = self.client.get("/nodos")
+        self.assertEqual(respuesta.status_code, 500)
+
+    def test_notificaciones_acepta_limite_consultado(self):
+        with patch.object(
+            main, "obtener_notificaciones_alertas", return_value=[{"id": "n1", "canal": "sms"}]
+        ) as notificaciones:
+            respuesta = self.client.get("/notificaciones?limite=120")
+        self.assertEqual(respuesta.status_code, 200)
+        notificaciones.assert_called_once_with(limite=120)
+
+
 if __name__ == "__main__":
     unittest.main()

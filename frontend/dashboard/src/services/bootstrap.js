@@ -18,7 +18,7 @@ export const bootstrapDashboard = async (dispatch) => {
 
 export const bootstrapAlerts = async (dispatch) => {
   try {
-    await dispatch(loadAlerts('active')).unwrap();
+    await dispatch(loadAlerts()).unwrap();
   } catch (error) {
     console.warn('[bootstrap] No fue posible cargar alertas de la API SAT', error);
     dispatch(hydrateAlerts([]));

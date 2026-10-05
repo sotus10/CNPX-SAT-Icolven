@@ -10,6 +10,11 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { loadAlerts } from '../store/slices/alertsSlice';
+import AlertConfirmationDonut from '../components/dashboard/charts/AlertConfirmationDonut';
+import NotificationsStackedChart from '../components/dashboard/charts/NotificationsStackedChart';
+import SuscripcionPush from '../components/dashboard/SuscripcionPush';
+import { useNotifications } from '../hooks/useSatAnalytics';
+import { buildAlertConfirmation, buildNotificationSeries } from '../utils/series';
 
 const SEVERITY_CONFIG = {
   critical: { Icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', label: 'Crítica' },
@@ -42,6 +47,7 @@ const AlertsPage = () => {
   const dispatch = useDispatch();
   const { alerts, loading, error } = useSelector((state) => state.alerts);
   const [severity, setSeverity] = React.useState('all');
+  const notificationsQuery = useNotifications(200);
 
   useEffect(() => {
     dispatch(loadAlerts());
@@ -52,8 +58,23 @@ const AlertsPage = () => {
     () => alerts.filter((alert) => severity === 'all' || alert.severity === severity),
     [alerts, severity]
   );
-  const confirmedCount = alerts.filter((alert) => alert.confirmada_por_satelite).length;
-  const severeCount = alerts.filter((alert) => ['critical', 'high'].includes(alert.severity)).length;
+  // Las gráficas 6 y 8 resumen el histórico completo, no el filtro de severidad.
+  const confirmacion = useMemo(() => buildAlertConfirmation(alerts), [alerts]);
+  const notificaciones = useMemo(
+    () => buildNotificationSeries(notificationsQuery.data),
+    [notificationsQuery.data]
+  );
+
+  const { confirmed: confirmedCount, severe: severeCount } = useMemo(
+    () => ({
+      confirmed: confirmacion.find((sector) => sector.id === 'confirmadas')?.value ?? 0,
+      severe: alerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'high').length,
+    }),
+    [confirmacion, alerts]
+  );
+  const notificationsError = notificationsQuery.isError
+    ? notificationsQuery.error?.message ?? 'No fue posible consultar las notificaciones.'
+    : null;
 
   return (
     <div className="space-y-5">
@@ -84,6 +105,8 @@ const AlertsPage = () => {
           </div>
         ))}
       </div>
+
+      <SuscripcionPush />
 
       <div className="flex flex-wrap items-center gap-3">
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#808080]">
@@ -148,7 +171,23 @@ const AlertsPage = () => {
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <AlertConfirmationDonut
+          sectors={confirmacion}
+          total={alerts.length}
+          badge={`${alerts.length} alertas registradas`}
+          error={error && alerts.length === 0 ? 'No fue posible conectar con el servicio de alertas.' : null}
+        />
+        <NotificationsStackedChart
+          filas={notificaciones.filas}
+          resumen={notificaciones.resumen}
+          badge="notificaciones_alertas"
+          error={notificationsError}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+
                       <p className="text-[14px] font-semibold text-carbon">{alert.title}</p>
                       <span
                         className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Save, Bell, Waves, Siren, CheckCircle2, MapPin, Mountain, Container } from 'lucide-react';
 import { updateAlertRule } from '../services/api';
 import { APP_ENV, API_URL } from '../config';
+import MiWhatsapp from '../components/dashboard/MiWhatsapp';
 
 const RangeSlider = ({ label, value, onChange, min, max, step = 1, unit = '' }) => (
   <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_4rem] items-center gap-x-3 gap-y-2 py-4">
@@ -95,6 +96,8 @@ const SettingsPage = () => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <MiWhatsapp />
+
         <section className="bg-white dark:bg-slate-900 border border-line dark:border-slate-800 rounded-card shadow-card p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin size={16} className="text-primary" />

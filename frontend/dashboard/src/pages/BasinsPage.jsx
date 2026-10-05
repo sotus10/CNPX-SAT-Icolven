@@ -3,20 +3,22 @@ import { Bell, CloudRain, Filter, Gauge, Waves } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import ActivityChart from '../components/dashboard/ActivityChart';
 import AlertPanel from '../components/dashboard/AlertPanel';
+import NodeConnectivityPanel from '../components/dashboard/charts/NodeConnectivityPanel';
 import Select from '../components/ui/Select';
 import useSatData from '../hooks/useSatData';
-
-const PERIOD_OPTIONS = [
-  { key: 24, label: 'Últimas 24 horas' },
-  { key: 48, label: 'Últimas 48 horas' },
-];
-
-const hourLabel = (value) => value?.slice(11, 16) ?? '';
+import { useNodes } from '../hooks/useSatAnalytics';
+import { PERIOD_OPTIONS, buildNodeConnectivity, hourLabel, periodLabel } from '../utils/series';
 
 const BasinsPage = () => {
   const [period, setPeriod] = useState(24);
   const { satellite, readings, alerts, errors, loading, lastUpdated } = useSatData();
+  const nodesQuery = useNodes();
   const latestReading = readings[0];
+
+  const nodos = useMemo(() => buildNodeConnectivity(nodesQuery.data), [nodesQuery.data]);
+  const nodesError = nodesQuery.isError
+    ? nodesQuery.error?.message ?? 'No fue posible consultar los nodos.'
+    : null;
 
   const displayedKpis = useMemo(() => [
     { id: 'rain-24h', label: 'Precipitación acumulada · 24 h', value: satellite?.accumulated_24h_mm ?? '—', unit: 'mm', icon: CloudRain, subtext: 'Open-Meteo' },
@@ -37,7 +39,7 @@ const BasinsPage = () => {
     })),
     [readings, period]
   );
-  const periodLabel = PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? 'Últimas 24 horas';
+  const etiquetaPeriodo = periodLabel(period);
 
   return (
     <div className="space-y-5">
@@ -82,13 +84,19 @@ const BasinsPage = () => {
         </p>
       )}
 
+      <NodeConnectivityPanel
+        nodos={nodos}
+        badge={`${nodos.length} nodos registrados`}
+        error={nodesError}
+      />
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <ActivityChart
           data={rainSeries}
           title="Precipitación horaria Open-Meteo (mm)"
-          range={periodLabel}
+          range={etiquetaPeriodo}
         />
-        <ActivityChart data={sensorSeries} title="Distancia sensor–agua LoRa (cm)" range={periodLabel} />
+        <ActivityChart data={sensorSeries} title="Distancia sensor–agua LoRa (cm)" range={etiquetaPeriodo} />
       </div>
 
       <AlertPanel />

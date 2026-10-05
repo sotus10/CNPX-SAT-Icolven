@@ -7,6 +7,10 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Se exporta para los endpoints de suscripción push, que son públicos por diseño
+// (los llama el navegador del suscriptor, no el nodo con X-API-Key).
+export { apiClient as api };
+
 const getDataEndpointError = (error, resource) => {
   if (!error.response) {
     return `No se pudo conectar con la API (${API_URL}). Verifica que el backend esté activo.`;
@@ -15,6 +19,24 @@ const getDataEndpointError = (error, resource) => {
     return `La API responde, pero no pudo consultar ${resource}. Verifica SUPABASE_URL y SUPABASE_KEY en backend/.env.`;
   }
   return error.response.data?.detail ?? error.message;
+};
+
+const unwrapRows = (payload, resource) => {
+  const rows = Array.isArray(payload) ? payload : payload?.data;
+  if (!Array.isArray(rows)) {
+    throw new Error(`La API devolvió un formato de ${resource} no válido.`);
+  }
+  return rows;
+};
+
+const fetchRows = async (ruta, params, resource) => {
+  let data;
+  try {
+    ({ data } = await apiClient.get(ruta, { params }));
+  } catch (error) {
+    throw new Error(getDataEndpointError(error, resource));
+  }
+  return unwrapRows(data, resource);
 };
 
 apiClient.interceptors.request.use(
@@ -48,15 +70,8 @@ export const fetchSatelliteData = async (params = {}) => {
   return data;
 };
 
-export const fetchSensorHistory = async (limit = 48) => {
-  let data;
-  try {
-    ({ data } = await apiClient.get('/historial', { params: { limite: limit } }));
-  } catch (error) {
-    throw new Error(getDataEndpointError(error, 'las lecturas'));
-  }
-  return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-};
+export const fetchSensorHistory = (limit = 48) =>
+  fetchRows('/historial', { limite: limit }, 'las lecturas');
 
 export const fetchLatestSensorReading = async () => {
   const { data } = await apiClient.get('/ultima-lectura');
@@ -98,41 +113,88 @@ export const fetchCommsStatus = async () => {
   return data;
 };
 
+const SEVERITY_POR_NIVEL = {
+  ROJO: 'critical',
+  NARANJA: 'high',
+  AMARILLO: 'medium',
+  VERDE: 'low',
+};
+
 export const fetchAlerts = async () => {
-  let data;
-  try {
-    ({ data } = await apiClient.get('/alertas', { params: { limite: 100 } }));
-  } catch (error) {
-    throw new Error(getDataEndpointError(error, 'las alertas'));
-  }
-  const alerts = Array.isArray(data) ? data : data?.data;
-  if (!Array.isArray(alerts)) {
-    throw new Error('La API devolvió un formato de alertas no válido.');
-  }
+  const alerts = await fetchRows('/alertas', { limite: 100 }, 'las alertas');
 
   return alerts.map((alert) => {
     const level = String(alert.nivel_final ?? 'VERDE').toUpperCase();
-    const severity = {
-      ROJO: 'critical',
-      NARANJA: 'high',
-      AMARILLO: 'medium',
-      VERDE: 'low',
-    }[level] ?? 'low';
 
     return {
       ...alert,
       id: alert.id ?? alert.lectura_id,
       title: `Alerta ${level}`,
+      severity: SEVERITY_POR_NIVEL[level] ?? 'low',
       description: alert.confirmada_por_satelite
         ? 'Alerta registrada y confirmada con datos satelitales.'
         : 'Alerta registrada; no figura confirmación satelital.',
-      severity,
       status: 'recorded',
       timestamp: Date.parse(alert.timestamp) || Date.now(),
       metric: 'nivel_final',
       code: level,
     };
   });
+};
+
+export const fetchRawReadings = (limit = 120) =>
+  fetchRows('/lecturas-crudas', { limite: limit }, 'las lecturas crudas');
+
+export const fetchNodes = () => fetchRows('/nodos', undefined, 'los nodos');
+
+export const fetchNotifications = (limit = 200) =>
+  fetchRows('/notificaciones', { limite: limit }, 'las notificaciones');
+
+// --- WhatsApp -------------------------------------------------------------
+// El número se guarda en Supabase, no en el navegador: si viviera solo en
+// localStorage el backend no podría notificarlo.
+
+const whatsappError = (error) => {
+  if (!error.response) {
+    return `No se pudo conectar con la API (${API_URL}). Verifica que el backend esté activo.`;
+  }
+  return error.response.data?.detail ?? error.message;
+};
+
+export const fetchEstadoWhatsapp = async () => {
+  try {
+    const { data } = await apiClient.get('/whatsapp/estado');
+    return data;
+  } catch (error) {
+    throw new Error(whatsappError(error));
+  }
+};
+
+export const fetchMiContactoWhatsapp = async (telefono) => {
+  try {
+    const { data } = await apiClient.get('/whatsapp/contacto', { params: { telefono } });
+    return data;
+  } catch (error) {
+    throw new Error(whatsappError(error));
+  }
+};
+
+export const guardarMiContactoWhatsapp = async (payload) => {
+  try {
+    const { data } = await apiClient.post('/whatsapp/contactos', payload);
+    return data;
+  } catch (error) {
+    throw new Error(whatsappError(error));
+  }
+};
+
+export const revocarMiContactoWhatsapp = async (telefono) => {
+  try {
+    const { data } = await apiClient.post('/whatsapp/consentimiento/revocar', { telefono });
+    return data;
+  } catch (error) {
+    throw new Error(whatsappError(error));
+  }
 };
 
 export const updateAlertRule = async (id, payload) => {

@@ -4,14 +4,8 @@ import KPICard from '../components/dashboard/KPICard';
 import ActivityChart from '../components/dashboard/ActivityChart';
 import Select from '../components/ui/Select';
 import useSatData from '../hooks/useSatData';
+import { PERIOD_OPTIONS, hourLabel, periodLabel } from '../utils/series';
 import { jsPDF } from 'jspdf';
-
-const PERIOD_OPTIONS = [
-  { key: 24, label: 'Últimas 24 horas' },
-  { key: 48, label: 'Últimas 48 horas' },
-];
-
-const hourLabel = (value) => value?.slice(11, 16) ?? '';
 
 const exportCSV = (rows) => {
   if (!rows.length) return;
@@ -72,7 +66,7 @@ const ReportsPage = () => {
     if (format === 'pdf') exportPDF(rows);
   };
 
-  const periodLabel = PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? 'Últimas 24 horas';
+  const etiquetaPeriodo = periodLabel(period);
 
   return (
     <div className="space-y-5">
@@ -135,11 +129,11 @@ const ReportsPage = () => {
         </p>
       )}
 
-      <ActivityChart data={trend} title="Precipitación horaria Open-Meteo (mm)" range={periodLabel} />
+      <ActivityChart data={trend} title="Precipitación horaria Open-Meteo (mm)" range={etiquetaPeriodo} />
       <ActivityChart
         data={readings.slice(0, period).reverse().map((reading) => ({ label: hourLabel(reading.timestamp), value: Number(reading.distancia_cm), active: true }))}
         title="Distancia sensor–agua LoRa (cm)"
-        range={periodLabel}
+        range={etiquetaPeriodo}
       />
     </div>
   );

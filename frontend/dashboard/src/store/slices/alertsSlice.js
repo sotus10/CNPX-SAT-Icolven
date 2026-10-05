@@ -3,11 +3,14 @@ import * as api from '../../services/api';
 
 export const loadAlerts = createAsyncThunk(
   'alerts/loadAlerts',
-  async (status = 'active', { rejectWithValue }) => {
+  // `api.fetchAlerts` ya envuelve los fallos en `new Error(mensaje)`, así que el
+  // error normalizado no trae `response`: leer solo `error.message` evita que el
+  // estado de error quede en undefined.
+  async (_status, { rejectWithValue }) => {
     try {
-      return await api.fetchAlerts(status);
+      return await api.fetchAlerts();
     } catch (error) {
-      return rejectWithValue(error.response?.data?.detail ?? error.message);
+      return rejectWithValue(error.message ?? 'No fue posible consultar las alertas.');
     }
   }
 );

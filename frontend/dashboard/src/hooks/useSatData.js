@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchAlerts, fetchSatelliteData, fetchSensorHistory } from '../services/api';
 
-const useSatData = () => {
+/**
+ * `limit` debe cubrir el periodo más largo que la página pueda seleccionar: los
+ * selectores de "últimas 24/48 horas" recortan en cliente, así que pedir menos
+ * que el máximo dejaría la opción larga con menos datos de los que promete.
+ */
+const MAX_PERIODO = 48;
+
+const useSatData = (limit = MAX_PERIODO) => {
   const [satellite, setSatellite] = useState(null);
   const [readings, setReadings] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -13,7 +20,7 @@ const useSatData = () => {
     setLoading(true);
     const [satelliteResult, readingsResult, alertsResult] = await Promise.allSettled([
       fetchSatelliteData(),
-      fetchSensorHistory(),
+      fetchSensorHistory(limit),
       fetchAlerts(),
     ]);
 
@@ -37,7 +44,7 @@ const useSatData = () => {
     setErrors(nextErrors);
     setLastUpdated(new Date());
     setLoading(false);
-  }, []);
+  }, [limit]);
 
   useEffect(() => {
     refresh();

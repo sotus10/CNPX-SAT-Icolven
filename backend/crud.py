@@ -158,3 +158,72 @@ def obtener_datos_satelitales_recientes():
         .execute()
     )
     return respuesta.data
+
+
+def obtener_nodos():
+    """Retorna los nodos registrados con su estado administrativo."""
+    cliente = _require_supabase()
+    respuesta = (
+        cliente.table("nodos")
+        .select("id, nombre, ubicacion, estado, created_at")
+        .order("nombre")
+        .execute()
+    )
+    return respuesta.data
+
+
+def obtener_lecturas_limpias_por_nodo(limite: int = 500):
+    """Retorna lecturas limpias recientes para resolver la última de cada nodo.
+
+    Se consulta en orden descendente para que la primera aparición de cada `nodo_id`
+    sea su lectura más reciente, sin depender de un join en PostgREST.
+    """
+    cliente = _require_supabase()
+    respuesta = (
+        cliente.table("lecturas_limpias")
+        .select("nodo_id, timestamp, distancia_cm, velocidad_cm_min, nivel")
+        .order("timestamp", desc=True)
+        .limit(limite)
+        .execute()
+    )
+    return respuesta.data
+
+
+def obtener_configuracion_nodos():
+    """Retorna los umbrales de alerta y el límite de velocidad de cada nodo."""
+    cliente = _require_supabase()
+    respuesta = (
+        cliente.table("configuracion_nodos")
+        .select(
+            "id, nodo_id, umbral_amarillo_cm, umbral_naranja_cm, "
+            "umbral_rojo_cm, limite_velocidad_cm_min, updated_at"
+        )
+        .order("updated_at", desc=True)
+        .execute()
+    )
+    return respuesta.data
+
+
+def obtener_lecturas_crudas(limite: int = 100, nodo_id: str | None = None):
+    """Retorna las lecturas crudas (sin filtrar) para auditar el filtro de ruido."""
+    cliente = _require_supabase()
+    consulta = cliente.table("lecturas_crudas").select(
+        "id, nodo_id, nodo_codigo, distancia_cm, velocidad_cm_min, timestamp"
+    )
+    if nodo_id is not None:
+        consulta = consulta.eq("nodo_id", nodo_id)
+    respuesta = consulta.order("timestamp", desc=True).limit(limite).execute()
+    return respuesta.data
+
+
+def obtener_notificaciones_alertas(limite: int = 500):
+    """Retorna los envíos a la comunidad por canal y estado de envío."""
+    cliente = _require_supabase()
+    respuesta = (
+        cliente.table("notificaciones_alertas")
+        .select("id, alerta_id, canal, estado_envio, tipo_destinatario, timestamp")
+        .order("timestamp", desc=True)
+        .limit(limite)
+        .execute()
+    )
+    return respuesta.data

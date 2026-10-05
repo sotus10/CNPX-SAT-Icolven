@@ -13,14 +13,10 @@ export const useMetrics = (params, options = {}) =>
     }
   );
 
-export const useAlerts = (status = 'active', options = {}) =>
-  useQuery(
-    ['alerts', status],
-    () => api.fetchAlerts(status),
-    {
-      refetchInterval: 30000,
-      ...options,
-    }
-  );
+export const useAlerts = (options = {}) =>
+  useQuery(['alerts'], () => api.fetchAlerts(), {
+    refetchInterval: 30000,
+    ...options,
+  });
 
 export default { useMetrics, useAlerts };

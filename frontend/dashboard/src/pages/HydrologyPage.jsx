@@ -3,19 +3,22 @@ import { CloudRain, Filter, Gauge, Waves } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import ActivityChart from '../components/dashboard/ActivityChart';
 import AlertPanel from '../components/dashboard/AlertPanel';
+import HydroDualAxisChart from '../components/dashboard/charts/HydroDualAxisChart';
+import RawVsCleanChart from '../components/dashboard/charts/RawVsCleanChart';
 import Select from '../components/ui/Select';
 import useSatData from '../hooks/useSatData';
+import { useRawReadings } from '../hooks/useSatAnalytics';
+import { PERIOD_OPTIONS, buildAuditSeries, buildHydroSeries, hourLabel, periodLabel } from '../utils/series';
 
-const PERIOD_OPTIONS = [
-  { key: 24, label: 'Últimas 24 horas' },
-  { key: 48, label: 'Últimas 48 horas' },
-];
-
-const hourLabel = (value) => value?.slice(11, 16) ?? '';
+// Ventana de la auditoría del filtro. Debe coincidir con el límite de
+// `useSatData` (48) para que ambas ventanas abran el mismo periodo y el descarte
+// de lecturas crudas sea contable.
+const AUDIT_LIMIT = 48;
 
 const HydrologyPage = () => {
   const [period, setPeriod] = useState(24);
   const { satellite, readings, errors, loading, lastUpdated } = useSatData();
+  const rawQuery = useRawReadings(AUDIT_LIMIT);
   const latestReading = readings[0];
 
   const displayedKpis = useMemo(() => [
@@ -57,7 +60,18 @@ const HydrologyPage = () => {
     })),
     [readings, period]
   );
-  const periodLabel = PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? 'Últimas 24 horas';
+  const etiquetaPeriodo = periodLabel(period);
+
+  // Gráfica 4: río contra lluvia sobre una línea de tiempo común.
+  const hydro = useMemo(() => buildHydroSeries(satellite, readings, period), [satellite, readings, period]);
+
+  // Gráfica 5: auditoría del filtro, sobre la misma ventana que `readings`.
+  const audit = useMemo(
+    () => buildAuditSeries(rawQuery.data, readings, AUDIT_LIMIT),
+    [rawQuery.data, readings]
+  );
+
+  const rawError = rawQuery.isError ? (rawQuery.error?.message ?? 'No fue posible consultar las lecturas crudas.') : null;
 
   return (
     <div className="space-y-5">
@@ -102,15 +116,30 @@ const HydrologyPage = () => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <HydroDualAxisChart
+          puntos={hydro.puntos}
+          lag={hydro.lag}
+          badge={etiquetaPeriodo}
+          error={errors.satellite || errors.readings || null}
+        />
+        <RawVsCleanChart
+          puntos={audit.puntos}
+          resumen={audit.resumen}
+          badge={`Últimas ${AUDIT_LIMIT} lecturas crudas`}
+          error={rawError}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <ActivityChart
           data={rainfallSeries}
           title="Precipitación horaria · Open-Meteo (mm)"
-          range={periodLabel}
+          range={etiquetaPeriodo}
         />
         <ActivityChart
           data={sensorSeries}
           title="Distancia sensor–agua · LoRa (cm)"
-          range={periodLabel}
+          range={etiquetaPeriodo}
         />
       </div>
 
