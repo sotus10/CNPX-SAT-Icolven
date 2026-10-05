@@ -24,7 +24,7 @@ const int ECHO_PIN = 13; // Cable naranja (con divisor de voltaje)
 #define LORA_DIO0  26
 
 #define LORA_FREQUENCY 915E6
-#define NODO_ID "SENSOR_RIO_1"
+#define NODO_ID "RIO_01"
 
 // Dirección I2C estándar de la pantalla LCD (0x27 o 0x3F)
 LiquidCrystal_I2C lcd(0x27, 16, 2);
