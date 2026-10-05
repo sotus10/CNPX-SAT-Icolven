@@ -1,195 +1,205 @@
-#include <SPI.h> 
-#include <LoRa.h> 
-#include <esp_sleep.h> 
-#define PIN_TRIG 25 
-#define PIN_ECHO 13 
-#define LORA_SCK 5 
-#define LORA_MISO 19 
-#define LORA_MOSI 27 
-#define LORA_SS 18 
-#define LORA_RST 23 
-#define LORA_DIO0  26 
-#define LORA_FREQUENCY 915E6 
-#define NODE_ID  "RIO_01" 
-#define MEDICIONES_POR_CICLO 5 
-#define TIMEOUT_ECO_US 30000 
-#define INTERVALO_NORMAL_SEG 600 
-#define INTERVALO_ALERTA_SEG 60 
-#define UMBRAL_AMARILLO_CM 80.0 
-#define UMBRAL_NARANJA_CM 50.0 
-#define UMBRAL_ROJO_CM 30.0 
-#define VELOCIDAD_PELIGROSA_CM_MIN   5.0 
-#define DISTANCIA_MIN_VALIDA_CM   2.0 
-#define DISTANCIA_MAX_VALIDA_CM   450.0 
-RTC_DATA_ATTR float    distanciaAnterior_cm   = -1; 
-RTC_DATA_ATTR uint64_t segundosDelCicloAnterior = INTERVALO_NORMAL_SEG; 
-RTC_DATA_ATTR uint32_t numeroDeCiclo          
-bool   inicializarLoRa(); 
-float  medirDistanciaPromedio_cm(); 
-float  medirUnaVezDistancia_cm(); 
-= 0; 
-String calcularNivelAlerta(float distancia_cm, float velocidad_cm_min); 
-void   enviarAlertaLoRa(const String &nivel, float distancia_cm, float velocidad_cm_min); 
-void   dormir(uint64_t segundos); 
-void setup() { 
-Serial.begin(115200); 
-delay(200); 
-numeroDeCiclo++; 
-Serial.println(); 
-  Serial.printf("Ciclo #%u\n", numeroDeCiclo); 
- 
-  pinMode(PIN_TRIG, OUTPUT); 
- 
-  pinMode(PIN_ECHO, INPUT); 
- 
-  digitalWrite(PIN_TRIG, LOW); 
- 
-  if (!inicializarLoRa()) { 
- 
-    Serial.println("ERROR: LoRa no inició."); 
- 
-    dormir(INTERVALO_NORMAL_SEG); 
- 
-    return; 
- 
-  } 
- 
-  float distancia_cm = medirDistanciaPromedio_cm(); 
- 
-  if (distancia_cm < 0) { 
- 
-    Serial.println("ADVERTENCIA: sensor sin lectura válida."); 
- 
-    dormir(INTERVALO_NORMAL_SEG); 
- 
-    return; 
- 
-  } 
- 
-  float velocidad_cm_min = 0; 
- 
-  if (distanciaAnterior_cm >= 0) { 
- 
-    float minutosTranscurridos = segundosDelCicloAnterior / 60.0f; 
- 
-    float deltaCm = distanciaAnterior_cm - distancia_cm; 
- 
-    velocidad_cm_min = deltaCm / minutosTranscurridos; 
- 
-  } 
- 
-  String nivel = calcularNivelAlerta(distancia_cm, velocidad_cm_min); 
- 
-  enviarAlertaLoRa(nivel, distancia_cm, velocidad_cm_min); 
- 
-  distanciaAnterior_cm = distancia_cm; 
- 
-  uint64_t proximoIntervalo = (nivel == "VERDE") ? INTERVALO_NORMAL_SEG : INTERVALO_ALERTA_SEG; 
- 
-  segundosDelCicloAnterior = proximoIntervalo; 
- 
-  dormir(proximoIntervalo); 
- 
-} 
- 
-void loop() {} 
- 
-bool inicializarLoRa() { 
- 
-  SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS); 
- 
-  LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0); 
- 
-  return LoRa.begin(LORA_FREQUENCY); 
- 
-} 
- 
-float medirDistanciaPromedio_cm() { 
- 
-  float suma = 0; 
- 
-  int lecturasValidas = 0; 
- 
-  for (int i = 0; i < MEDICIONES_POR_CICLO; i++) { 
- 
-    float d = medirUnaVezDistancia_cm(); 
- 
-    if (d >= DISTANCIA_MIN_VALIDA_CM && d <= DISTANCIA_MAX_VALIDA_CM) { 
- 
-      suma += d; 
- 
-      lecturasValidas++; 
- 
-    } 
- 
-    delay(60); 
- 
-  } 
- 
-  if (lecturasValidas == 0) return -1; 
- 
-  return suma / lecturasValidas; 
- 
-} 
- 
-float medirUnaVezDistancia_cm() { 
- 
-  digitalWrite(PIN_TRIG, LOW); 
- 
-  delayMicroseconds(2); 
- 
-  digitalWrite(PIN_TRIG, HIGH); 
- 
-  delayMicroseconds(10); 
- 
-  digitalWrite(PIN_TRIG, LOW); 
- 
-  long duracion_us = pulseIn(PIN_ECHO, HIGH, TIMEOUT_ECO_US); 
- 
-  if (duracion_us == 0) return -1; 
- 
-  return (duracion_us * 0.0343f) / 2.0f; 
- 
-} 
- 
-String calcularNivelAlerta(float distancia_cm, float velocidad_cm_min) { 
- 
-  if (distancia_cm <= UMBRAL_ROJO_CM)    return "ROJO"; 
- 
-  if (distancia_cm <= UMBRAL_NARANJA_CM) return "NARANJA"; 
- 
-  bool subiendoRapido = (velocidad_cm_min >= VELOCIDAD_PELIGROSA_CM_MIN); 
- 
-  if (distancia_cm <= UMBRAL_AMARILLO_CM) return subiendoRapido ? "NARANJA" : "AMARILLO"; 
- 
-  if (subiendoRapido) return "AMARILLO"; 
- 
-  return "VERDE"; 
- 
-} 
- 
-void enviarAlertaLoRa(const String &nivel, float distancia_cm, float velocidad_cm_min) { 
- 
-  String mensaje = String(NODE_ID) + "," + nivel + "," + String(distancia_cm, 1) + "," + String(velocidad_cm_min, 2); 
- 
-  LoRa.beginPacket(); 
- 
-  LoRa.print(mensaje); 
- 
-  LoRa.endPacket(); 
- 
-  Serial.println("Enviado: " + mensaje); 
- 
-} 
- 
-void dormir(uint64_t segundos) { 
- 
-  Serial.printf("Durmiendo %llu segundos...\n", segundos); 
- 
-  Serial.flush(); 
- 
-  esp_sleep_enable_timer_wakeup(segundos * 1000000ULL); 
- 
-  esp_deep_sleep_start(); 
- 
+// ============================================================================
+// PROYECTO SAT - NODO TRANSMISOR (SENSOR RÍO)
+// Colegio Adventista Icolven - Concurso Nacional de Programación Fedesoft 2026
+// ============================================================================
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <SPI.h>
+#include <LoRa.h>
+
+// ----------------------------------------------------------------------------
+// CONFIGURACIÓN DE PINES (ESP32 TRANSMISOR)
+// ----------------------------------------------------------------------------
+// Sensor Ultrasonico JSN-SR04T Waterproof
+const int TRIG_PIN = 25; // Cable azul
+const int ECHO_PIN = 13; // Cable naranja (con divisor de voltaje)
+
+// Pines del Módulo LoRa SX1276 Integrado o Externo en ESP32
+#define LORA_SCK   5
+#define LORA_MISO  19
+#define LORA_MOSI  27
+#define LORA_SS    18
+#define LORA_RST   23
+#define LORA_DIO0  26
+
+#define LORA_FREQUENCY 915E6
+#define NODO_ID "SENSOR_RIO_1"
+
+// Dirección I2C estándar de la pantalla LCD (0x27 o 0x3F)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Variables para cálculo de velocidad del agua
+float ultimaDistancia = -1.0;
+unsigned long ultimoTiempoMs = 0;
+
+// Umbrales de alerta según distancia al agua (ajustar según la altura real de tu río/maqueta)
+const float UMBRAL_AMARILLO = 150.0; // cm (ej: empieza a crecer)
+const float UMBRAL_NARANJA  = 100.0; // cm (ej: alerta moderada)
+const float UMBRAL_ROJO     = 50.0;  // cm (ej: desbordamiento inminente)
+
+// Declaración de funciones
+float tomarLecturaCruda();
+float obtenerMediana();
+String determinarNivel(float distancia);
+bool inicializarLoRa();
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  Serial.println("\n==================================================");
+  Serial.println("  INICIALIZANDO NODO TRANSMISOR (SAT ICOLVEN)  ");
+  Serial.println("==================================================");
+
+  // Inicializar pines del sensor
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  digitalWait(TRIG_PIN, LOW); // Nota: corregido a digitalWrite abajo
+
+  // Inicializar comunicación I2C (SDA=21, SCL=22)
+  Wire.begin(21, 22);
+  
+  // Inicializar pantalla LCD
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print(" SAT ICOLVEN ");
+  lcd.setCursor(0, 1);
+  lcd.print("Iniciando LoRa..");
+
+  // Inicializar LoRa
+  if (!inicializarLoRa()) {
+    Serial.println("[ERROR CRÍTICO] No se pudo iniciar LoRa en el transmisor.");
+    lcd.setCursor(0, 1);
+    lcd.print("Error LoRa!     ");
+    while (1) { delay(1000); }
+  }
+  Serial.println("[OK] LoRa Transmisor listo en 915 MHz.");
+
+  lcd.setCursor(0, 1);
+  lcd.print("LoRa Conectado  ");
+  delay(2000);
+  lcd.clear();
+
+  ultimoTiempoMs = millis();
+}
+
+void loop() {
+  float distancia = obtenerMediana();
+
+  // Calcular velocidad de cambio del nivel del agua (cm por minuto)
+  float velocidad = 0.0;
+  unsigned long tiempoActual = millis();
+  
+  if (distancia > 0 && ultimaDistancia > 0) {
+    float deltaDistancia = distancia - ultimaDistancia; // Positivo = baja el agua, Negativo = sube el agua
+    float deltaTimeMinutos = (tiempoActual - ultimoTiempoMs) / 60000.0;
+    if (deltaTimeMinutos > 0) {
+      velocidad = deltaDistancia / deltaTimeMinutos;
+    }
+  }
+  
+  if (distancia > 0) {
+    ultimaDistancia = distancia;
+    ultimoTiempoMs = tiempoActual;
+  }
+
+  // Determinar el nivel de alerta
+  String nivel = determinarNivel(distancia);
+
+  // 1. Mostrar en Monitor Serie
+  if (distancia < 0) {
+    Serial.println("[ALERTA] Zona ciega (< 20 cm) o sin eco.");
+  } else {
+    Serial.printf("Distancia: %.1f cm | Vel: %.2f cm/min | Nivel: %s\n", distancia, velocidad, nivel.c_str());
+  }
+
+  // 2. Transmitir por LoRa si la lectura es válida
+  if (distancia > 0) {
+    String tramaLoRa = String(NODO_ID) + "," + nivel + "," + String(distancia, 1) + "," + String(velocidad, 2);
+    
+    LoRa.beginPacket();
+    LoRa.print(tramaLoRa);
+    LoRa.endPacket();
+
+    Serial.printf("[LORA ENVIADO] %s\n", tramaLoRa.c_str());
+  }
+
+  // 3. Mostrar en Pantalla LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Nivel: ");
+  lcd.print(nivel);
+  lcd.print("   "); // Limpiar caracteres sobrantes
+
+  lcd.setCursor(0, 1);
+  if (distancia < 0) {
+    lcd.print("ERR: Sin Eco    ");
+  } else {
+    char buffer[17];
+    snprintf(buffer, sizeof(buffer), "D:%.1fcm V:%.0f", distancia, velocidad);
+    lcd.print(buffer);
+  }
+
+  delay(2000); // Pausa de 2 segundos entre lecturas y envíos LoRa
+}
+
+// ----------------------------------------------------------------------------
+// FUNCIONES AUXILIARES
+// ----------------------------------------------------------------------------
+
+bool inicializarLoRa() {
+  SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
+  LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
+  return LoRa.begin(LORA_FREQUENCY);
+}
+
+float tomarLecturaCruda() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(5);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(20);
+  digitalWrite(TRIG_PIN, LOW);
+
+  unsigned long duracion = pulseIn(ECHO_PIN, HIGH, 60000); 
+  if (duracion < 1160 || duracion == 0) return -1.0; 
+  
+  return (duracion * 0.0343) / 2.0;
+}
+
+float obtenerMediana() {
+  float muestras[5];
+  int validas = 0;
+
+  for (int i = 0; i < 5; i++) {
+    float lectura = tomarLecturaCruda();
+    if (lectura > 0) {
+      muestras[validas] = lectura;
+      validas++;
+    }
+    delay(40);
+  }
+
+  if (validas == 0) return -1.0;
+
+  for (int i = 0; i < validas - 1; i++) {
+    for (int j = i + 1; j < validas; j++) {
+      if (muestras[i] > muestras[j]) {
+        float temp = muestras[i];
+        muestras[i] = muestras[j];
+        muestras[j] = temp;
+      }
+    }
+  }
+
+  return muestras[validas / 2];
+}
+
+String determinarNivel(float distancia) {
+  if (distancia < 0) return "VERDE"; // Si falla el sensor, por seguridad no dispara falso positivo
+  if (distancia <= UMBRAL_ROJO)     return "ROJO";
+  if (distancia <= UMBRAL_NARANJA)  return "NARANJA";
+  if (distancia <= UMBRAL_AMARILLO) return "AMARILLO";
+  return "VERDE";
 }
