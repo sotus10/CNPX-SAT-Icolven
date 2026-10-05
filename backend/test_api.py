@@ -89,10 +89,12 @@ class LecturasApiTests(unittest.TestCase):
             with patch.object(main, "obtener_nodo_id", return_value="node-uuid"):
                 with patch.object(main, "asociar_lectura_cruda_nodo") as asociar_cruda:
                     with patch.object(main, "insertar_lectura", return_value=[lectura_guardada]):
-                        with patch.object(main, "insertar_alerta", return_value=[{"id": "alert-id"}]) as alerta:
-                            respuesta = self.client.post(
-                                "/api/lecturas", json=self.datos, headers=self.headers
-                            )
+                        with patch.object(main, "obtener_ultimas_lecturas", return_value=[]):
+                            with patch.object(main, "obtener_datos_satelitales_recientes", return_value=[]):
+                                with patch.object(main, "insertar_alerta", return_value=[{"id": "alert-id"}]) as alerta:
+                                    respuesta = self.client.post(
+                                        "/api/lecturas", json=self.datos, headers=self.headers
+                                    )
         self.assertEqual(respuesta.status_code, 201)
         self.assertEqual(respuesta.json()["lectura"], lectura_guardada)
         self.assertEqual(respuesta.json()["alerta"]["id"], "alert-id")

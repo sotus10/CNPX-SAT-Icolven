@@ -89,15 +89,12 @@ def insertar_lectura(
     return respuesta.data
 
 
-def obtener_ultimas_lecturas(limite: int = 5):
+def obtener_ultimas_lecturas(limite: int = 5, nodo_id: str | None = None):
     cliente = _require_supabase()
-    respuesta = (
-        cliente.table("lecturas_limpias")
-        .select("*")
-        .order("timestamp", desc=True)
-        .limit(limite)
-        .execute()
-    )
+    consulta = cliente.table("lecturas_limpias").select("*")
+    if nodo_id is not None:
+        consulta = consulta.eq("nodo_id", nodo_id)
+    respuesta = consulta.order("timestamp", desc=True).limit(limite).execute()
     return respuesta.data
 
 

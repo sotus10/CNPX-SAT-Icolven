@@ -21,8 +21,9 @@ from crud import (
     obtener_nodo_id,
     obtener_todas_las_alertas,
     obtener_ultima_lectura,
+    obtener_ultimas_lecturas,
 )
-from decision import decidir_alerta
+from decision import evaluar_alerta_fusionada
 from limpieza import limpiar_lectura
 
 
@@ -153,17 +154,36 @@ async def recibir_lectura(
             datos_limpios["nivel"],
             lectura_cruda_id,
         )
+        try:
+            lecturas_recientes = obtener_ultimas_lecturas(limite=6, nodo_id=nodo_uuid)
+        except Exception as error:
+            # El historial solo aporta corroboración; no debe bloquear la regla
+            # de seguridad basada en la medición recién recibida.
+            print(f"[WARN] No se pudo consultar tendencia del río: {error}")
+            lecturas_recientes = []
+        try:
+            datos_satelitales = obtener_datos_satelitales_recientes()
+        except Exception as error:
+            print(f"[WARN] No se pudo consultar contexto satelital: {error}")
+            datos_satelitales = []
+
+        decision = evaluar_alerta_fusionada(
+            lectura[0],
+            lecturas_recientes=lecturas_recientes,
+            datos_satelitales=datos_satelitales,
+        )
         alerta = None
-        if decidir_alerta(datos_limpios["nivel"]):
+        if decision["crear_alerta"]:
             alerta = insertar_alerta(
                 lectura[0]["id"],
-                datos_limpios["nivel"],
-                confirmada_por_satelite=False,
+                decision["nivel_final"],
+                confirmada_por_satelite=decision["confirmada_por_satelite"],
             )
         return {
             "status": "success",
             "lectura": lectura[0],
             "alerta": alerta[0] if alerta else None,
+            "decision": decision,
         }
     except HTTPException:
         raise
