@@ -48,7 +48,7 @@ const useSatData = (limit = MAX_PERIODO) => {
 
   useEffect(() => {
     refresh();
-    const interval = window.setInterval(refresh, 5 * 60 * 1000);
+    const interval = window.setInterval(refresh, 15 * 1000);
     return () => window.clearInterval(interval);
   }, [refresh]);
 
