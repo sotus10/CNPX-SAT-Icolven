@@ -1,6 +1,7 @@
 import math
 from typing import Any
-
+import os
+VELOCIDAD_MAX_CM_MIN = float(os.getenv("VELOCIDAD_MAX_CM_MIN", "50"))
 
 NIVELES_VALIDOS = ("VERDE", "AMARILLO", "NARANJA", "ROJO")
 

@@ -99,7 +99,8 @@ const HydroDualAxisChart = ({ puntos = [], lag = null, error, badge, height = 30
             name="Distancia al agua"
             stroke={NIVEL_COLOR}
             strokeWidth={2.5}
-            dot={false}
+            dot={{ r: 3, fill: NIVEL_COLOR, strokeWidth: 0 }}
+            activeDot={{ r: 5 }}
             connectNulls
           />
         </ComposedChart>

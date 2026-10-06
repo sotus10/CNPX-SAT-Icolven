@@ -34,9 +34,9 @@ float ultimaDistancia = -1.0;
 unsigned long ultimoTiempoMs = 0;
 
 // Umbrales de alerta según distancia al agua (ajustar según la altura real de tu río/maqueta)
-const float UMBRAL_AMARILLO = 80.0; // cm (ej: empieza a crecer)
-const float UMBRAL_NARANJA  = 50.0; // cm (ej: alerta moderada)
-const float UMBRAL_ROJO     = 20.0;  // cm (ej: desbordamiento inminente)
+const float UMBRAL_AMARILLO = 86.0; // cm (ej: empieza a crecer)
+const float UMBRAL_NARANJA  = 80.0; // cm (ej: alerta moderada)
+const float UMBRAL_ROJO     = 76.5;  // cm (ej: desbordamiento inminente)
 
 // Declaración de funciones
 float tomarLecturaCruda();
