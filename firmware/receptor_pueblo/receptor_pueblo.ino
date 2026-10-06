@@ -39,8 +39,8 @@
 #if WIFI_HABILITADO
   #include <WiFi.h>
   #include <HTTPClient.h>
-  const char* WIFI_SSID     = "Red_IoT_Icolven";
-  const char* WIFI_PASSWORD = "Fedesoft2026_Secure";
+  const char* WIFI_SSID     = "WIFI_4C";
+  const char* WIFI_PASSWORD = "5279YsD8";
   const char* BACKEND_URL   = "https://hnadrkkzucilttlpergc.supabase.co";
   const char* BACKEND_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYWRya2t6dWNpbHR0bHBlcmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5ODkwMDMsImV4cCI6MjEwNTU2NTAwM30.rw-u0h2CHJE6f7MVyKQolh98HgOo4CHdFfumYndfbrEO";
 #endif
