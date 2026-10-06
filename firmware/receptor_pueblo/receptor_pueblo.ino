@@ -40,8 +40,8 @@
   #include <WiFi.h>
   #include <HTTPClient.h>
   #include <WiFiClientSecure.h> // <-- AGREGAR ESTA LÍNEA OBLIGATORIA
-  const char* WIFI_SSID     = "WIFI_4C";
-  const char* WIFI_PASSWORD = "5279YsD8";
+  const char* WIFI_SSID     = "#Horizonte2030";
+  const char* WIFI_PASSWORD = "Unac.2030*";
   // Cambia "alertas_sat" por "alertas" al final de la URL
  const char* SUPABASE_BASE_URL = "https://hnadrkkzucilttlpergc.supabase.co/rest/v1";
   const char* BACKEND_API_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYWRya2t6dWNpbHR0bHBlcmdjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTk4OTAwMywiZXhwIjoyMTA1NTY1MDAzfQ.Z9OZfCCPZ53S-MuctZpvBqM9YBYyncxw1o0xScx3J-o";
@@ -245,7 +245,7 @@ void subirABackend(const String &nodo, const String &nivel, float distancia, flo
   String nodoUUID = "";
   if (nodo == "SENSOR_RIO_1") {
     // Reemplaza esta cadena con el UUID real de 'SENSOR_RIO_1' registrado en Supabase
-    nodoUUID = "11111111-1111-1111-1111-111111111111"; 
+    nodoUUID = "7d06e8c5-35d1-4f21-83f5-38e782de95e2"; 
   } else {
     nodoUUID = "00000000-0000-0000-0000-000000000000";
   }
