@@ -37,6 +37,34 @@ CREATE TABLE IF NOT EXISTS contactos_whatsapp (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- El CREATE TABLE de arriba es IF NOT EXISTS a propósito, pero eso significa que
+-- si la tabla YA existía con menos columnas no se reparó nada y el script
+-- terminaba sin errores dando la falsa impresión de que sí. Por eso se agrega
+-- cada columna por separado: correr este script sobre una tabla parcial la
+-- completa. Es idempotente, se puede correr las veces que sea.
+--
+-- Sin esto, el backend respondía 500 con
+-- 'column contactos_whatsapp.consentimiento does not exist' (Postgres 42703).
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    tipo_destinatario text NOT NULL DEFAULT 'persona';
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS entidad text;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    consentimiento text NOT NULL DEFAULT 'pendiente';
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS metodo_consentimiento text;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS texto_consentimiento text;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS consentimiento_otorgado_en timestamptz;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS consentimiento_revocado_en timestamptz;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    recibe_alertas boolean NOT NULL DEFAULT true;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    recibe_confirmaciones boolean NOT NULL DEFAULT false;
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    niveles text[] NOT NULL DEFAULT ARRAY['AMARILLO','NARANJA','ROJO']::text[];
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE contactos_whatsapp ADD COLUMN IF NOT EXISTS
+    updated_at timestamptz NOT NULL DEFAULT now();
+
 -- Un teléfono es una persona: evita duplicados y dobles avisos.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_contactos_whatsapp_telefono
     ON contactos_whatsapp (telefono);

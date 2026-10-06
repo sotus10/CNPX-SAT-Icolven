@@ -474,8 +474,9 @@ async def recibir_lectura(
             )
 
         # Un solo objeto de decision para la respuesta y para los canales, que
-        # leen decision["nivel_final"].
+        # leen decision["nivel_final"] y decision["crear_alerta"].
         decision = {
+            "crear_alerta": bool(alerta),
             "nivel_sensor": datos_limpios["nivel"],
             "nivel_final": nivel_final,
             "confirmada_por_satelite": confirmada,
