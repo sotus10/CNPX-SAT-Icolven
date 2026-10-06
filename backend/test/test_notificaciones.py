@@ -58,31 +58,56 @@ class DebeNotificarTests(unittest.TestCase):
                 )
 
     def test_conserva_la_decision_de_decision_py(self):
-        from decision import evaluar_alerta_fusionada
+        from decision import decidir_alerta
 
         ahora = datetime.now(timezone.utc)
         # Lluvia intensa y subida concordantes: la decisión real activa la alerta.
-        decision = evaluar_alerta_fusionada(
+        # decision.py ahora expone decidir_alerta(lectura, satelite) -> (nivel, confirmada).
+        nivel, confirmada = decidir_alerta(
             {
                 "id": "L1",
                 "nivel": "NARANJA",
                 "distancia_cm": 40.0,
                 "velocidad_cm_min": 6.0,
             },
-            lecturas_recientes=[
-                {"id": "L0", "timestamp": ahora.isoformat(), "distancia_cm": 80.0}
-            ],
-            datos_satelitales=[
-                {
-                    "timestamp": ahora.isoformat(),
-                    "precipitacion": 15.0,
-                    "lluvia_acumulada_24h": 40.0,
-                }
-            ],
-            ahora=ahora,
+            {
+                "timestamp": ahora.isoformat(),
+                "precipitacion": 15.0,
+                "lluvia_acumulada_24h": 40.0,
+            },
         )
+        decision = {
+            "crear_alerta": nivel != "VERDE",
+            "nivel_final": nivel,
+            "confirmada_por_satelite": confirmada,
+        }
         self.assertTrue(decision["crear_alerta"])
         self.assertTrue(noti.debe_notificar(decision))
+
+    def test_requiere_la_clave_crear_alerta(self):
+        """`debe_notificar` corta con decision.get("crear_alerta"). Si main.py
+        entrega un dict sin esa clave, los canales quedan mudos aunque haya
+        alerta, y ningun otro test lo detecta porque todos los fixtures la
+        incluyen."""
+        self.assertFalse(noti.debe_notificar({"nivel_final": "ROJO"}))
+
+    def test_contrato_de_la_decision_de_main(self):
+        """La forma que main.py construye tras insertar la alerta."""
+        decision_creada = {
+            "crear_alerta": True,
+            "nivel_sensor": "NARANJA",
+            "nivel_final": "ROJO",
+            "confirmada_por_satelite": True,
+        }
+        self.assertTrue(noti.debe_notificar(decision_creada))
+
+        decision_sin_alerta = {
+            "crear_alerta": False,
+            "nivel_sensor": "VERDE",
+            "nivel_final": "VERDE",
+            "confirmada_por_satelite": False,
+        }
+        self.assertFalse(noti.debe_notificar(decision_sin_alerta))
 
 
 class MensajeTests(unittest.TestCase):

@@ -89,12 +89,14 @@ class LecturasApiTests(unittest.TestCase):
             with patch.object(main, "obtener_nodo_id", return_value="node-uuid"):
                 with patch.object(main, "asociar_lectura_cruda_nodo") as asociar_cruda:
                     with patch.object(main, "insertar_lectura", return_value=[lectura_guardada]):
-                        with patch.object(main, "obtener_ultimas_lecturas", return_value=[]):
-                            with patch.object(main, "obtener_datos_satelitales_recientes", return_value=[]):
-                                with patch.object(main, "insertar_alerta", return_value=[{"id": "alert-id"}]) as alerta:
-                                    respuesta = self.client.post(
-                                        "/api/lecturas", json=self.datos, headers=self.headers
-                                    )
+                        # El flujo nuevo pide el satelite via
+                        # obtener_datos_satelite_para_decision(), no leyendo el
+                        # historial de lecturas.
+                        with patch.object(main, "obtener_datos_satelite_para_decision", return_value=None):
+                            with patch.object(main, "insertar_alerta", return_value=[{"id": "alert-id"}]) as alerta:
+                                respuesta = self.client.post(
+                                    "/api/lecturas", json=self.datos, headers=self.headers
+                                )
         self.assertEqual(respuesta.status_code, 201)
         self.assertEqual(respuesta.json()["lectura"], lectura_guardada)
         self.assertEqual(respuesta.json()["alerta"]["id"], "alert-id")
@@ -102,6 +104,26 @@ class LecturasApiTests(unittest.TestCase):
         alerta.assert_called_once_with(
             "clean-id", "AMARILLO", confirmada_por_satelite=False
         )
+        self.assertTrue(respuesta.json()["decision"]["crear_alerta"])
+        self.assertEqual(respuesta.json()["decision"]["nivel_final"], "AMARILLO")
+
+    def test_verde_no_crea_alerta_ni_dispara_canales(self):
+        datos = dict(self.datos, nivel="VERDE")
+        with patch.object(main, "insertar_lectura_cruda", return_value="raw-id"):
+            with patch.object(main, "obtener_nodo_id", return_value="node-uuid"):
+                with patch.object(main, "asociar_lectura_cruda_nodo"):
+                    with patch.object(main, "insertar_lectura", return_value=[{"id": "clean-id"}]):
+                        with patch.object(main, "obtener_datos_satelite_para_decision") as satelite:
+                            with patch.object(main, "insertar_alerta") as alerta:
+                                respuesta = self.client.post(
+                                    "/api/lecturas", json=datos, headers=self.headers
+                                )
+        self.assertEqual(respuesta.status_code, 201)
+        alerta.assert_not_called()
+        satelite.assert_not_called()
+        decision = respuesta.json()["decision"]
+        self.assertFalse(decision["crear_alerta"])
+        self.assertEqual(decision["nivel_final"], "VERDE")
 
     def test_clima_nulo_se_guarda_como_cero_y_24_horas(self):
         class FakeTable:

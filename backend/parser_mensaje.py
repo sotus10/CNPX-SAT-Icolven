@@ -1,22 +1,34 @@
 def parsear_mensaje(texto: str) -> dict:
     """
-    Parsea un texto plano separado por comas con el formato:
-    NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN
-    Ejemplo: "NODO_01,AMARILLO,145.2,6.5"
-    """
-    if not texto or not isinstance(texto, str):
-        raise ValueError("El mensaje recibido está vacío o no es una cadena de texto.")
+    Interpreta la trama CSV del transmisor en el dict que espera `limpiar_lectura`.
 
-    partes = [p.strip() for p in texto.split(",")]
+    Formato esperado: NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN
+    """
+    if not isinstance(texto, str):
+        raise ValueError("La trama debe ser texto")
+
+    linea = texto.strip().replace("\r", "").replace("\n", "")
+    if not linea:
+        raise ValueError("La trama está vacía")
+
+    partes = [parte.strip() for parte in linea.split(",")]
     if len(partes) != 4:
         raise ValueError(
-            f"Formato por comas inválido. Se esperaban 4 campos (NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN) "
-            f"pero se recibieron {len(partes)}: '{texto}'"
+            f"La trama debe tener 4 campos separados por comas (NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN) y recibió {len(partes)}"
         )
+
+    try:
+        distancia = float(partes[2])
+    except ValueError as error:
+        raise ValueError(f"distancia_cm no es numérico: {partes[2]!r}") from error
+    try:
+        velocidad = float(partes[3])
+    except ValueError as error:
+        raise ValueError(f"velocidad_cm_min no es numérico: {partes[3]!r}") from error
 
     return {
         "nodo_id": partes[0],
         "nivel": partes[1],
-        "distancia_cm": partes[2],
-        "velocidad_cm_min": partes[3],
+        "distancia_cm": distancia,
+        "velocidad_cm_min": velocidad,
     }
