@@ -34,15 +34,15 @@
 // ----------------------------------------------------------------------------
 // CONFIGURACIÓN OPCIONAL DE BACKEND / WIFI (STUB)
 // ----------------------------------------------------------------------------
-#define WIFI_HABILITADO 0 // Cambiar a 1 cuando el Backend de Supabase esté listo
+#define WIFI_HABILITADO 1 // Cambiar a 1 cuando el Backend de Supabase esté listo
 
 #if WIFI_HABILITADO
   #include <WiFi.h>
   #include <HTTPClient.h>
-  const char* WIFI_SSID     = "NOMBRE_DE_LA_RED";
-  const char* WIFI_PASSWORD = "CONTRASENA_AQUI";
-  const char* BACKEND_URL   = "http://tu-backend.example.com/api/lecturas";
-  const char* BACKEND_API_KEY = "CONFIGURAR_API_KEY_DEL_NODO";
+  const char* WIFI_SSID     = "Red_IoT_Icolven";
+  const char* WIFI_PASSWORD = "Fedesoft2026_Secure";
+  const char* BACKEND_URL   = "https://hnadrkkzucilttlpergc.supabase.co";
+  const char* BACKEND_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYWRya2t6dWNpbHR0bHBlcmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5ODkwMDMsImV4cCI6MjEwNTU2NTAwM30.rw-u0h2CHJE6f7MVyKQolh98HgOo4CHdFfumYndfbrEO";
 #endif
 
 // ----------------------------------------------------------------------------

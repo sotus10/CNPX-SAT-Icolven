@@ -28,7 +28,6 @@ from crud import (
     obtener_notificaciones_alertas,
     obtener_todas_las_alertas,
     obtener_ultima_lectura,
-    obtener_ultimas_lecturas,
 )
 from contactos import (
     ErrorConsentimiento,
@@ -40,7 +39,9 @@ from contactos import (
     revocar_consentimiento,
 )
 from contactos import ErrorEsquemaAusente as ErrorEsquemaContactos
-from decision import evaluar_alerta_fusionada
+from datetime import datetime, timezone
+
+from decision import decidir_alerta, requiere_alerta, satelite_vigente
 from limpieza import limpiar_lectura
 from notificaciones import (
     ErrorEsquemaPush,
@@ -52,6 +53,7 @@ from notificaciones import (
     registrar_dispositivo,
     vapid_configurado,
 )
+from parser_mensaje import parsear_mensaje
 from whatsapp import estado_modo as whatsapp_estado_modo
 from whatsapp import notificar_alerta_whatsapp
 
@@ -91,6 +93,41 @@ def verificar_api_key(api_key: str | None) -> None:
         raise HTTPException(status_code=503, detail="La API key del nodo no está configurada")
     if api_key is None or not hmac.compare_digest(api_key, clave_configurada):
         raise HTTPException(status_code=401, detail="API key inválida")
+
+
+def obtener_datos_satelite_para_decision() -> dict | None:
+    """Último dato satelital vigente para el motor de decisión.
+
+    1) usa la fila más reciente de datos_satelitales si no es muy vieja;
+    2) si no hay, consulta Open-Meteo y la guarda (así las gráficas también se llenan);
+    3) si todo falla devuelve None: la alerta del sensor se conserva sin confirmar.
+    Nunca lanza excepción: un fallo del satélite no debe tumbar la recepción de lecturas.
+    """
+    try:
+        recientes = obtener_datos_satelitales_recientes()
+        if recientes and satelite_vigente(recientes[0]):
+            return recientes[0]
+    except Exception as error:
+        print(f"[AVISO] No se pudo leer datos_satelitales: {error}")
+
+    try:
+        clima = obtener_clima(LATITUD, LONGITUD)
+        if clima is None:
+            return None
+        registro = {
+            "precipitacion": float(clima.get("lluvia_ultima_hora") or 0.0),
+            "lluvia_acumulada_24h": float(clima.get("lluvia_acumulada_24h") or 0.0),
+            "fuente": "open-meteo",
+        }
+        if supabase is not None:
+            try:
+                supabase.table("datos_satelitales").insert(registro).execute()
+            except Exception as error:
+                print(f"[AVISO] No se pudo guardar el clima consultado: {error}")
+        return {**registro, "timestamp": datetime.now(timezone.utc).isoformat()}
+    except Exception as error:
+        print(f"[AVISO] Open-Meteo no disponible para la decisión: {error}")
+        return None
 
 
 @app.get("/")
@@ -373,10 +410,31 @@ async def recibir_lectura(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ):
     verificar_api_key(x_api_key)
+
+    # Acepta JSON ({"nodo_id": ...}) o el texto plano con comas del LoRa
+    # (NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN).
+    texto = (await request.body()).decode("utf-8", errors="replace").strip()
+    detalle_formato = None
     try:
-        datos_recibidos = await request.json()
-    except (json.JSONDecodeError, UnicodeDecodeError) as error:
-        raise HTTPException(status_code=422, detail="El cuerpo debe ser JSON válido") from error
+        datos_recibidos = json.loads(texto)
+    except json.JSONDecodeError:
+        try:
+            datos_recibidos = parsear_mensaje(texto)
+        except ValueError as error:
+            datos_recibidos = None
+            detalle_formato = str(error)
+
+    if datos_recibidos is None:
+        # Aunque no se pueda interpretar, se conserva lo que llegó (auditoría).
+        try:
+            insertar_lectura_cruda({"texto_crudo": texto[:500]})
+        except Exception as error:
+            raise HTTPException(status_code=500, detail="No se pudo guardar la lectura cruda") from error
+        raise HTTPException(
+            status_code=422,
+            detail=detalle_formato
+            or "El cuerpo debe ser JSON o texto NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN",
+        )
 
     try:
         lectura_cruda_id = insertar_lectura_cruda(datos_recibidos)
@@ -404,31 +462,24 @@ async def recibir_lectura(
             datos_limpios["nivel"],
             lectura_cruda_id,
         )
-        try:
-            lecturas_recientes = obtener_ultimas_lecturas(limite=6, nodo_id=nodo_uuid)
-        except Exception as error:
-            # El historial solo aporta corroboración; no debe bloquear la regla
-            # de seguridad basada en la medición recién recibida.
-            print(f"[WARN] No se pudo consultar tendencia del río: {error}")
-            lecturas_recientes = []
-        try:
-            datos_satelitales = obtener_datos_satelitales_recientes()
-        except Exception as error:
-            print(f"[WARN] No se pudo consultar contexto satelital: {error}")
-            datos_satelitales = []
-
-        decision = evaluar_alerta_fusionada(
-            lectura[0],
-            lecturas_recientes=lecturas_recientes,
-            datos_satelitales=datos_satelitales,
-        )
         alerta = None
-        if decision["crear_alerta"]:
+        nivel_final, confirmada = datos_limpios["nivel"], False
+        if requiere_alerta(datos_limpios["nivel"]):
+            satelite = obtener_datos_satelite_para_decision()
+            nivel_final, confirmada = decidir_alerta(datos_limpios, satelite)
             alerta = insertar_alerta(
                 lectura[0]["id"],
-                decision["nivel_final"],
-                confirmada_por_satelite=decision["confirmada_por_satelite"],
+                nivel_final,
+                confirmada_por_satelite=confirmada,
             )
+
+        # Un solo objeto de decision para la respuesta y para los canales, que
+        # leen decision["nivel_final"].
+        decision = {
+            "nivel_sensor": datos_limpios["nivel"],
+            "nivel_final": nivel_final,
+            "confirmada_por_satelite": confirmada,
+        }
 
         # Los avisos a celulares y a WhatsApp reutilizan la decisión ya resuelta
         # arriba. Van best-effort: si un canal falla, la lectura y su alerta
