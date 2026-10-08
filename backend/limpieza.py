@@ -47,7 +47,7 @@ def limpiar_lectura(datos: Any) -> dict[str, Any]:
             datos.get("distancia_cm"), 2, 450, "distancia_cm"
         ), 1),
         "velocidad_cm_min": round(validar_numero(
-            datos.get("velocidad_cm_min"), -50, 50, "velocidad_cm_min"
+            datos.get("velocidad_cm_min"), -1000, 1000, "velocidad_cm_min"
         ), 2),
         "nivel": validar_nivel(datos.get("nivel")),
     }
