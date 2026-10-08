@@ -33,10 +33,10 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 float ultimaDistancia = -1.0;
 unsigned long ultimoTiempoMs = 0;
 
-// Umbrales de alerta según distancia al agua (ajustar según la altura real de tu río/maqueta)
-const float UMBRAL_AMARILLO = 86.0; // cm (ej: empieza a crecer)
-const float UMBRAL_NARANJA  = 80.0; // cm (ej: alerta moderada)
-const float UMBRAL_ROJO     = 76.5;  // cm (ej: desbordamiento inminente)
+// Umbrales de alerta según distancia al agua (ajustar según la altura real)
+const float UMBRAL_AMARILLO = 86.0; // cm
+const float UMBRAL_NARANJA  = 80.0; // cm
+const float UMBRAL_ROJO     = 76.5; // cm
 
 // Declaración de funciones
 float tomarLecturaCruda();
@@ -55,7 +55,7 @@ void setup() {
   // Inicializar pines del sensor
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
-  digitalWrite(TRIG_PIN, LOW); // Nota: corregido a digitalWrite abajo
+  digitalWrite(TRIG_PIN, LOW);
 
   // Inicializar comunicación I2C (SDA=21, SCL=22)
   Wire.begin(21, 22);
@@ -94,7 +94,7 @@ void loop() {
   unsigned long tiempoActual = millis();
   
   if (distancia > 0 && ultimaDistancia > 0) {
-    float deltaDistancia = ultimaDistancia - distancia; // Positivo = baja el agua, Negativo = sube el agua
+    float deltaDistancia = ultimaDistancia - distancia; // Positivo = baja, Negativo = sube
     float deltaTimeMinutos = (tiempoActual - ultimoTiempoMs) / 60000.0;
     if (deltaTimeMinutos > 0) {
       velocidad = deltaDistancia / deltaTimeMinutos;
@@ -142,7 +142,7 @@ void loop() {
     lcd.print(buffer);
   }
 
-  delay(2000); // Pausa de 2 segundos entre lecturas y envíos LoRa
+  delay(2000); // Pausa de 2 segundos entre transmisiones
 }
 
 // ----------------------------------------------------------------------------
@@ -162,7 +162,10 @@ float tomarLecturaCruda() {
   delayMicroseconds(20);
   digitalWrite(TRIG_PIN, LOW);
 
-  unsigned long duracion = pulseIn(ECHO_PIN, HIGH, 60000); 
+  // Timeout de 30ms (hasta ~5 metros de alcance)
+  unsigned long duracion = pulseIn(ECHO_PIN, HIGH, 30000); 
+  
+  // El JSN-SR04T tiene zona ciega en los primeros ~20cm (~1160us)
   if (duracion < 1160 || duracion == 0) return -1.0; 
   
   return (duracion * 0.0343) / 2.0;
@@ -178,11 +181,13 @@ float obtenerMediana() {
       muestras[validas] = lectura;
       validas++;
     }
-    delay(40);
+    // 120ms entre lecturas para disipar resonancia acústica del transductor
+    delay(120); 
   }
 
-  if (validas == 0) return -1.0;
+  if (validas == 0) return -1.0; // Muestra error si no hay ecos válidos
 
+  // Ordenar arreglo para obtener la mediana pura
   for (int i = 0; i < validas - 1; i++) {
     for (int j = i + 1; j < validas; j++) {
       if (muestras[i] > muestras[j]) {
@@ -193,11 +198,12 @@ float obtenerMediana() {
     }
   }
 
+  // Se retorna la mediana directa sin filtros que congelen o ralenticen la lectura
   return muestras[validas / 2];
 }
 
 String determinarNivel(float distancia) {
-  if (distancia < 0) return "VERDE"; // Si falla el sensor, por seguridad no dispara falso positivo
+  if (distancia < 0) return "VERDE";
   if (distancia <= UMBRAL_ROJO)     return "ROJO";
   if (distancia <= UMBRAL_NARANJA)  return "NARANJA";
   if (distancia <= UMBRAL_AMARILLO) return "AMARILLO";
