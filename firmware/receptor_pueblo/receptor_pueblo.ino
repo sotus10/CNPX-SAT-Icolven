@@ -34,17 +34,20 @@
 // ----------------------------------------------------------------------------
 // CONFIGURACIÓN OPCIONAL DE BACKEND / WIFI (STUB)
 // ----------------------------------------------------------------------------
-#define WIFI_HABILITADO 1 // Cambiar a 1 cuando el Backend de Supabase esté listo
+#define WIFI_HABILITADO 1   // 1 = sube cada lectura al backend por WiFi; 0 = solo alarma local
 
 #if WIFI_HABILITADO
   #include <WiFi.h>
   #include <HTTPClient.h>
-  #include <WiFiClientSecure.h> // <-- AGREGAR ESTA LÍNEA OBLIGATORIA
-  const char* WIFI_SSID     = "#Horizonte2030";
-  const char* WIFI_PASSWORD = "Unac.2030*";
-  // Cambia "alertas_sat" por "alertas" al final de la URL
- const char* SUPABASE_BASE_URL = "https://hnadrkkzucilttlpergc.supabase.co/rest/v1";
-  const char* BACKEND_API_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYWRya2t6dWNpbHR0bHBlcmdjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTk4OTAwMywiZXhwIjoyMTA1NTY1MDAzfQ.Z9OZfCCPZ53S-MuctZpvBqM9YBYyncxw1o0xScx3J-o";
+  // Rellena estos 4 valores EN TU COMPUTADOR y no los subas a GitHub.
+  const char* WIFI_SSID       = "Ardila";
+  const char* WIFI_PASSWORD   = "*HaJaSa*";
+  // IP del computador que corre Docker (en Windows: ipconfig -> "Dirección IPv4").
+  // NO uses "localhost": desde el ESP32 localhost es el propio ESP32.
+  const char* BACKEND_URL     = "http://192.168.1.18:8000/api/lecturas";
+  // Igual a NODE_API_KEY de backend/.env (una clave larga inventada por ustedes).
+  // NUNCA pongas aquí una clave de Supabase.
+  const char* BACKEND_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYWRya2t6dWNpbHR0bHBlcmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5ODkwMDMsImV4cCI6MjEwNTU2NTAwM30.rw-u0h2CHJE6f7MVyKQolh98HgOo4CHdFfumYndfbrE";
 #endif
 
 // ----------------------------------------------------------------------------
@@ -234,77 +237,30 @@ void revisarTimeoutComunicacion() {
 
 void subirABackend(const String &nodo, const String &nivel, float distancia, float velocidad) {
 #if WIFI_HABILITADO
-  if (WiFi.status() != WL_CONNECTED) return;
+  // La alarma local (relé + buzzer) ya se activó antes de llegar aquí:
+  // si no hay WiFi o el backend falla, la sirena funciona igual.
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[WIFI] Sin conexion; se intenta reconectar. Esta lectura NO se sube.");
+    WiFi.reconnect();
+    return;
+  }
 
-  WiFiClientSecure client;
-  client.setInsecure();
+  // Mismo texto que viaja por LoRa: NODO_ID,NIVEL,DISTANCIA_CM,VELOCIDAD_CM_MIN
+  String cuerpo = nodo + "," + nivel + "," + String(distancia, 1) + "," + String(velocidad, 2);
 
   HTTPClient http;
+  http.begin(BACKEND_URL);
+  http.setTimeout(20000);   // el backend puede tardar si consulta Open-Meteo
+  http.addHeader("Content-Type", "text/plain");
+  http.addHeader("X-API-Key", BACKEND_API_KEY);
 
-  // 1. Convertir el nombre del nodo a su UUID correspondiente en Supabase
-  String nodoUUID = "";
-  if (nodo == "SENSOR_RIO_1") {
-    // Reemplaza esta cadena con el UUID real de 'SENSOR_RIO_1' registrado en Supabase
-    nodoUUID = "7d06e8c5-35d1-4f21-83f5-38e782de95e2"; 
+  int codigo = http.POST(cuerpo);
+  Serial.printf("[HTTP POST] %s -> Backend respondio: %d (201 = OK)\n", cuerpo.c_str(), codigo);
+  if (codigo > 0) {
+    Serial.println(http.getString());   // incluye la decision y el motivo si fue rechazada (422)
   } else {
-    nodoUUID = "00000000-0000-0000-0000-000000000000";
+    Serial.printf("[HTTP] Error de conexion: %s\n", HTTPClient::errorToString(codigo).c_str());
   }
-
-  // 2. POST A TABLA 'lecturas'
-  String urlLecturas = String(SUPABASE_BASE_URL) + "/lecturas";
-  http.begin(client, urlLecturas);
-  
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", BACKEND_API_KEY);
-  http.addHeader("Authorization", "Bearer " + String(BACKEND_API_KEY));
-  http.addHeader("Prefer", "return=representation");
-
-  // Se envía 'nodoUUID' en la clave 'nodo_id'
-  String jsonLectura = "{"
-                       "\"nodo_id\":\"" + nodoUUID + "\","
-                       "\"distancia_cm\":" + String(distancia, 1) + ","
-                       "\"velocidad_cm_min\":" + String(velocidad, 2) +
-                       "}";
-
-  int codigoLectura = http.POST(jsonLectura);
-  String respuestaLectura = http.getString();
   http.end();
-
-  Serial.printf("[HTTP POST LECTURAS] Código: %d | Respuesta: %s\n", codigoLectura, respuestaLectura.c_str());
-
-  if (codigoLectura < 200 || codigoLectura >= 300) {
-    Serial.println("[ERROR] No se pudo registrar la lectura en la base de datos.");
-    return;
-  }
-
-  // Extraer el UUID 'id' de la lectura generada
-  int posId = respuestaLectura.indexOf("\"id\":\"");
-  if (posId == -1) {
-    Serial.println("[ERROR] No se encontró la clave 'id' en la respuesta de lecturas.");
-    return;
-  }
-  
-  String lecturaUUID = respuestaLectura.substring(posId + 6, posId + 6 + 36);
-
-  // 3. POST A TABLA 'alertas'
-  String urlAlertas = String(SUPABASE_BASE_URL) + "/alertas";
-  http.begin(client, urlAlertas);
-
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", BACKEND_API_KEY);
-  http.addHeader("Authorization", "Bearer " + String(BACKEND_API_KEY));
-  http.addHeader("Prefer", "return=minimal");
-
-  String jsonAlerta = "{"
-                      "\"lectura_id\":\"" + lecturaUUID + "\","
-                      "\"nivel_final\":\"" + nivel + "\","
-                      "\"confirmada_por_satelite\":true"
-                      "}";
-
-  int codigoAlerta = http.POST(jsonAlerta);
-  String respuestaAlerta = http.getString();
-  http.end();
-
-  Serial.printf("[HTTP POST ALERTAS] Código: %d | Respuesta: %s\n", codigoAlerta, respuestaAlerta.c_str());
 #endif
 }

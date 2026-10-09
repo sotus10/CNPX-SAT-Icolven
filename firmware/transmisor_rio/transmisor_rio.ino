@@ -34,9 +34,9 @@ float ultimaDistancia = -1.0;
 unsigned long ultimoTiempoMs = 0;
 
 // Umbrales de alerta según distancia al agua (ajustar según la altura real)
-const float UMBRAL_AMARILLO = 86.0; // cm
-const float UMBRAL_NARANJA  = 80.0; // cm
-const float UMBRAL_ROJO     = 76.5; // cm
+const float UMBRAL_AMARILLO = 82.9; // cm
+const float UMBRAL_NARANJA  = 77.8; // cm
+const float UMBRAL_ROJO     = 72.6; // cm
 
 // Declaración de funciones
 float tomarLecturaCruda();
@@ -162,8 +162,8 @@ float tomarLecturaCruda() {
   delayMicroseconds(20);
   digitalWrite(TRIG_PIN, LOW);
 
-  // Timeout de 30ms (hasta ~5 metros de alcance)
-  unsigned long duracion = pulseIn(ECHO_PIN, HIGH, 30000); 
+  // Timeout de 50ms (hasta ~5 metros de alcance)
+  unsigned long duracion = pulseIn(ECHO_PIN, HIGH, 50000); 
   
   // El JSN-SR04T tiene zona ciega en los primeros ~20cm (~1160us)
   if (duracion < 1160 || duracion == 0) return -1.0; 
@@ -172,22 +172,24 @@ float tomarLecturaCruda() {
 }
 
 float obtenerMediana() {
-  float muestras[5];
+  float muestras[7];
   int validas = 0;
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 7; i++) {
     float lectura = tomarLecturaCruda();
     if (lectura > 0) {
       muestras[validas] = lectura;
       validas++;
     }
-    // 120ms entre lecturas para disipar resonancia acústica del transductor
-    delay(120); 
+    // Reposo de 150 ms para dar tiempo a disipar la resonancia 
+    // y permitir que se estabilice la alimentación de 5V
+    delay(150); 
   }
 
-  if (validas == 0) return -1.0; // Muestra error si no hay ecos válidos
+  // Si no hay al menos 3 lecturas válidas, se retorna error (-1.0)
+  if (validas < 3) return -1.0; 
 
-  // Ordenar arreglo para obtener la mediana pura
+  // Ordenar lecturas de menor a mayor
   for (int i = 0; i < validas - 1; i++) {
     for (int j = i + 1; j < validas; j++) {
       if (muestras[i] > muestras[j]) {
@@ -198,8 +200,15 @@ float obtenerMediana() {
     }
   }
 
-  // Se retorna la mediana directa sin filtros que congelen o ralenticen la lectura
-  return muestras[validas / 2];
+  // Descartar el valor mínimo (muestras[0]) y el máximo (muestras[validas - 1])
+  // para eliminar picos de ruido bruscos
+  float suma = 0;
+  for (int i = 1; i < validas - 1; i++) {
+    suma += muestras[i];
+  }
+
+  // Promediar las muestras intermedias restantes
+  return suma / (validas - 2);
 }
 
 String determinarNivel(float distancia) {
